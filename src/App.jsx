@@ -7,6 +7,8 @@ import Transactions from './pages/Transactions'
 import Cards from './pages/Cards'
 import Goals from './pages/Goals'
 import Onboarding from './pages/Onboarding'
+import Insights from './pages/Insights'
+import AI from './pages/AI'
 import Layout from './components/Layout'
 
 const PrivateRoute = ({ children }) => {
@@ -25,6 +27,8 @@ export default function App() {
         <Route path="cards" element={<Cards />} />
         <Route path="goals" element={<Goals />} />
         <Route path="onboarding" element={<Onboarding />} />
+        <Route path="insights" element={<Insights />} />
+        <Route path="ai" element={<AI />} />
       </Route>
     </Routes>
   )
