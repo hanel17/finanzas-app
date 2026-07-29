@@ -5,6 +5,8 @@ import { TrendingUp, TrendingDown, Wallet, Target, Plus, ArrowRight } from 'luci
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { Link } from 'react-router-dom'
 import QuickAdd from '../components/QuickAdd'
+import AIBar from '../components/AIBar'
+import ScanStatement from '../components/ScanStatement'
 
 const COLORS = ['#00d084','#4cc9f0','#ffd60a','#ff4d6d','#7b2fff','#f77f00','#06d6a0','#e63946']
 const CAT_ICONS = { comida:'🍔', transporte:'🚗', hogar:'🏠', servicios:'⚡', salud:'💊', entretenimiento:'🎬', tarjeta:'💳', diezmo:'🙏', ahorro:'🏦', ropa:'👕', gas:'⛽', otros:'📦' }
@@ -14,6 +16,7 @@ export default function Dashboard() {
   const [data, setData] = useState({ profile: null, cards: [], expenses: [], transactions: [], goals: [] })
   const [loading, setLoading] = useState(true)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [showScan, setShowScan] = useState(false)
 
   const load = useCallback(async () => {
     const [p, c, e, t, g] = await Promise.all([
@@ -79,10 +82,17 @@ export default function Dashboard() {
             {new Date().toLocaleDateString('es-DO', { weekday: 'long', day: 'numeric', month: 'long' })}
           </div>
         </div>
-        <button onClick={() => setShowQuickAdd(true)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px' }}>
-          <Plus size={16} /> Agregar
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setShowScan(true)} style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', fontSize: 13 }}>
+            📄 Escanear
+          </button>
+          <button onClick={() => setShowQuickAdd(true)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px' }}>
+            <Plus size={16} /> Agregar
+          </button>
+        </div>
       </div>
+
+      <AIBar userName={profile?.full_name?.split(' ')[0]} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
         <StatCard icon={<TrendingUp size={16}/>} label="Ingreso mensual" value={`RD$${totalIncome.toLocaleString()}`} color="var(--green)" sub={`Tú + pareja`} />
@@ -228,6 +238,7 @@ export default function Dashboard() {
       )}
 
       {showQuickAdd && <QuickAdd onClose={() => setShowQuickAdd(false)} onSaved={load} />}
+      {showScan && <ScanStatement onClose={() => setShowScan(false)} onSaved={load} />}
 
       <button onClick={() => setShowQuickAdd(true)} style={{ position:'fixed', bottom:24, right:24, width:52, height:52, borderRadius:'50%', background:'var(--green)', color:'#000', fontSize:24, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 4px 20px rgba(0,208,132,0.4)', zIndex:200 }}>
         <Plus size={22} />
