@@ -52,14 +52,14 @@ export default function ScanStatement({ onClose, onSaved }) {
     try {
       const text = await readFileAsText(file)
       // Split text into chunks of 5000 chars with overlap
-      const chunkSize = 5000
+      const chunkSize = 4000
       const chunks = []
       for (let i = 0; i < text.length; i += chunkSize) {
         chunks.push(text.slice(i, i + chunkSize))
       }
       
       let allParsed = []
-      for (let ci = 0; ci < Math.min(chunks.length, 3); ci++) {
+      for (let ci = 0; ci < Math.min(chunks.length, 5); ci++) {
         setProgress(30 + (ci * 20))
         const context = `Extrae TODOS los movimientos financieros de este fragmento de estado de cuenta. Responde SOLO con JSON array. Cada objeto: date (YYYY-MM-DD), description (string), amount (numero positivo), type (income o expense), category (comida/transporte/servicios/salud/entretenimiento/hogar/otros). Si no hay movimientos responde []. Fragmento ${ci+1}: ${chunks[ci]}`
         
