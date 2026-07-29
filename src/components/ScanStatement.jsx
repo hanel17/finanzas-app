@@ -51,29 +51,42 @@ export default function ScanStatement({ onClose, onSaved }) {
 
     try {
       const text = await readFileAsText(file)
-      const context = `Extrae los movimientos financieros de este texto. Responde SOLO con un JSON array valido. Cada objeto debe tener: date (YYYY-MM-DD), description (string), amount (numero), type (income o expense), category (string). Texto: ${text.slice(0, 3000)}`
-      
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + import.meta.env.VITE_GROQ_API_KEY },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          messages: [
-            { role: "system", content: "Eres un extractor de datos financieros. Responde SOLO con un JSON array valido, sin texto adicional, sin markdown." },
-            { role: "user", content: context }
-          ]
-        })
-      })
-      const data = await res.json()
-      const rawText = data.choices?.[0]?.message?.content || "[]"
-      
-      let parsed = []
-      try {
-        const jsonMatch = rawText.match(/\[.*\]/s)
-        parsed = JSON.parse(jsonMatch ? jsonMatch[0] : rawText)
-      } catch(e) {
-        parsed = fallbackParse(text)
+      // Split text into chunks of 5000 chars with overlap
+      const chunkSize = 5000
+      const chunks = []
+      for (let i = 0; i < text.length; i += chunkSize) {
+        chunks.push(text.slice(i, i + chunkSize))
       }
+      
+      let allParsed = []
+      for (let ci = 0; ci < Math.min(chunks.length, 3); ci++) {
+        setProgress(30 + (ci * 20))
+        const context = `Extrae TODOS los movimientos financieros de este fragmento de estado de cuenta. Responde SOLO con JSON array. Cada objeto: date (YYYY-MM-DD), description (string), amount (numero positivo), type (income o expense), category (comida/transporte/servicios/salud/entretenimiento/hogar/otros). Si no hay movimientos responde []. Fragmento ${ci+1}: ${chunks[ci]}`
+        
+        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + import.meta.env.VITE_GROQ_API_KEY },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            max_tokens: 2000,
+            messages: [
+              { role: "system", content: "Eres un extractor de datos financieros bancarios dominicanos. Responde SOLO con JSON array valido, sin markdown, sin explicaciones." },
+              { role: "user", content: context }
+            ]
+          })
+        })
+        const data = await res.json()
+        const rawText = data.choices?.[0]?.message?.content || "[]"
+        try {
+          const jsonMatch = rawText.match(/\[.*?\]/s)
+          const chunk_parsed = JSON.parse(jsonMatch ? jsonMatch[0] : rawText)
+          allParsed = [...allParsed, ...chunk_parsed]
+        } catch(e) {
+          console.log("Chunk parse error:", e)
+        }
+      }
+      
+      let parsed = allParsed
 
       const enriched = parsed.map((m, i) => ({
         ...m,
