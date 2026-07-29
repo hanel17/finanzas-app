@@ -16,9 +16,7 @@ const WELCOME = "Hola! Soy tu asistente financiero personal. Puedo analizar tus 
 
 export default function AI() {
   const { user } = useAuth()
-  const [messages, setMessages] = useState([
-    { role: "assistant", content: WELCOME }
-  ])
+  const [messages, setMessages] = useState([{ role: "assistant", content: WELCOME }])
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef(null)
@@ -33,23 +31,20 @@ export default function AI() {
       supabase.from("transactions").select("*").eq("user_id", user.id).order("date", { ascending: false }).limit(50),
       supabase.from("savings_goals").select("*").eq("user_id", user.id),
     ])
-
     const p = profile.data || {}
     const totalIncome = (p.monthly_income||0) + (p.spouse_income||0)
     const totalDebt = (cards.data||[]).reduce((s,c)=>s+Number(c.current_balance),0)
     const totalFixed = (expenses.data||[]).reduce((s,e)=>s+Number(e.amount),0)
-
     const txByCategory = (transactions.data||[]).reduce((acc,t) => {
       if(t.type==="expense") acc[t.category] = (acc[t.category]||0) + Number(t.amount)
       return acc
     }, {})
-
-    return "CONTEXTO FINANCIERO:" +
+    return "DATOS FINANCIEROS DEL USUARIO:" +
       " Ingreso mensual: RD$" + totalIncome +
       " | Gastos fijos: RD$" + totalFixed +
       " | Disponible: RD$" + (totalIncome-totalFixed) +
       " | Deuda tarjetas: RD$" + totalDebt +
-      " | Tarjetas: " + (cards.data||[]).map(c => c.bank_name + " " + c.card_name + " RD$" + c.current_balance + "/" + c.credit_limit).join(", ") +
+      " | Tarjetas: " + (cards.data||[]).map(c=>c.bank_name+" "+c.card_name+" balance:RD$"+c.current_balance+" limite:RD$"+c.credit_limit).join(", ") +
       " | Gastos por categoria: " + Object.entries(txByCategory).sort((a,b)=>b[1]-a[1]).map(([k,v])=>k+":RD$"+v).join(", ") +
       " | Metas: " + (goals.data||[]).map(g=>g.name+" RD$"+g.current_amount+"/"+g.target_amount).join(", ")
   }
@@ -61,26 +56,31 @@ export default function AI() {
     const newMessages = [...messages, { role: "user", content: msg }]
     setMessages(newMessages)
     setLoading(true)
-
     try {
       const context = await getFinancialContext()
-      const chatHistory = newMessages.slice(1).map(m => ({
+      const systemPrompt = "Eres un asesor financiero personal experto en finanzas dominicanas. Da consejos especificos y accionables basados en los datos reales del usuario. Se directo, amigable y usa los montos exactos. Habla en espanol. " + context
+      const contents = newMessages.slice(1).map(m => ({
         role: m.role === "assistant" ? "model" : "user",
         parts: [{ text: m.content }]
       }))
-      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyAQ-Ab8RN6Js-bsVx881yWBsqYxaxCF_ZVOwKWg1se-F53L0s1G52w", {
+      if (contents.length === 0 || contents[0].role !== "user") {
+        contents.unshift({ role: "user", parts: [{ text: msg }] })
+      }
+      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          system_instruction: { parts: [{ text: "Eres un asesor financiero personal experto. Da consejos especificos y accionables basados en los datos del usuario. Se directo y amigable. Habla en espanol dominicano. " + context }] },
-          contents: chatHistory
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: contents
         })
       })
       const data = await response.json()
-      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Lo siento, hubo un error."
+      console.log("Gemini response:", data)
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || data.error?.message || "Sin respuesta del asistente."
       setMessages(prev => [...prev, { role: "assistant", content: reply }])
     } catch (e) {
-      setMessages(prev => [...prev, { role: "assistant", content: "Error conectando con el asistente." }])
+      console.error(e)
+      setMessages(prev => [...prev, { role: "assistant", content: "Error: " + e.message }])
     }
     setLoading(false)
   }
@@ -88,7 +88,7 @@ export default function AI() {
   return (
     <div style={{ display:"flex", flexDirection:"column", height:"calc(100vh - 120px)", maxHeight:700 }}>
       <div style={{ marginBottom:20 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:4 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
           <div style={{ width:36, height:36, borderRadius:10, background:"rgba(123,47,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", color:"var(--purple)" }}><Bot size={18}/></div>
           <div>
             <h1 style={{ fontSize:20, fontWeight:700 }}>Asistente IA</h1>
@@ -96,7 +96,6 @@ export default function AI() {
           </div>
         </div>
       </div>
-
       <div style={{ flex:1, overflowY:"auto", display:"flex", flexDirection:"column", gap:12, paddingBottom:16 }}>
         {messages.map((m, i) => (
           <div key={i} style={{ display:"flex", justifyContent:m.role==="user"?"flex-end":"flex-start" }}>
@@ -111,14 +110,13 @@ export default function AI() {
         {loading && (
           <div style={{ display:"flex", gap:8, alignItems:"center" }}>
             <div style={{ width:28, height:28, borderRadius:8, background:"rgba(123,47,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", color:"var(--purple)", flexShrink:0 }}><Bot size={14}/></div>
-            <div style={{ padding:"10px 14px", background:"var(--bg2)", borderRadius:"16px 16px 16px 4px", border:"1px solid var(--border)", display:"flex", gap:4 }}>
+            <div style={{ padding:"10px 14px", background:"var(--bg2)", borderRadius:"16px 16px 16px 4px", border:"1px solid var(--border)", display:"flex", gap:4, alignItems:"center" }}>
               {[0,1,2].map(i => <div key={i} style={{ width:6, height:6, borderRadius:"50%", background:"var(--purple)", animation:"pulse 1s "+i*0.2+"s infinite" }} />)}
             </div>
           </div>
         )}
         <div ref={bottomRef} />
       </div>
-
       {messages.length <= 1 && (
         <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:12 }}>
           {SUGGESTIONS.map((s,i) => (
@@ -128,7 +126,6 @@ export default function AI() {
           ))}
         </div>
       )}
-
       <div style={{ display:"flex", gap:8, background:"var(--bg2)", border:"1px solid var(--border2)", borderRadius:14, padding:"6px 6px 6px 14px" }}>
         <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendMessage()} placeholder="Pregunta algo sobre tus finanzas..." style={{ flex:1, background:"transparent", border:"none", padding:"6px 0", fontSize:14 }} />
         <button onClick={() => sendMessage()} disabled={!input.trim()||loading} style={{ background:input.trim()?"var(--purple)":"var(--bg4)", color:"#fff", width:36, height:36, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", padding:0, flexShrink:0 }}>
