@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Send, Bot } from 'lucide-react'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const SUGGESTIONS = [
   "¿En qué estoy gastando más?",
@@ -57,31 +58,28 @@ export default function AI() {
     setLoading(true)
 
     try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+      const genAI = new GoogleGenerativeAI(apiKey)
       const context = await getFinancialContext()
-      const chatHistory = newMessages.slice(1).map(m => ({
+      
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        systemInstruction: "Eres un asesor financiero personal experto. Da consejos específicos y accionables basados en los datos del usuario. Sé directo y amigable. Habla en español dominicano. " + context
+      })
+
+      const history = newMessages.slice(1, -1).map(m => ({
         role: m.role === "assistant" ? "model" : "user",
         parts: [{ text: m.content }]
       }))
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": import.meta.env.VITE_GEMINI_API_KEY
-        },
-        body: JSON.stringify({
-          system_instruction: { 
-            parts: [{ text: "Eres un asesor financiero personal experto. Da consejos específicos y accionables basados en los datos del usuario. Sé directo y amigable. Habla en español dominicano. " + context }] 
-          },
-          contents: chatHistory
-        })
-      })
+      const chat = model.startChat({ history })
+      const result = await chat.sendMessage(q)
+      const responseText = result.response.text()
 
-      const data = await response.json()
-      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Lo siento, hubo un error al consultar a Gemini."
-      setMessages(prev => [...prev, { role: "assistant", content: reply }])
+      setMessages(prev => [...prev, { role: "assistant", content: responseText }])
     } catch (e) {
-      setMessages(prev => [...prev, { role: "assistant", content: "Error de conexión." }])
+      console.error("Error con Gemini SDK:", e)
+      setMessages(prev => [...prev, { role: "assistant", content: "Lo siento, hubo un error al consultar a Gemini." }])
     } finally {
       setLoading(false)
     }
