@@ -64,18 +64,20 @@ export default function AI() {
 
     try {
       const context = await getFinancialContext()
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const chatHistory = newMessages.slice(1).map(m => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content }]
+      }))
+      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyAQ-Ab8RN6Js-bsVx881yWBsqYxaxCF_ZVOwKWg1se-F53L0s1G52w", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1000,
-          system: "Eres un asesor financiero personal experto. Tienes acceso a los datos financieros del usuario y debes dar consejos especificos y accionables. Se directo y amigable. Habla en espanol. " + context,
-          messages: newMessages.slice(1).map(m => ({ role: m.role, content: m.content }))
+          system_instruction: { parts: [{ text: "Eres un asesor financiero personal experto. Da consejos especificos y accionables basados en los datos del usuario. Se directo y amigable. Habla en espanol dominicano. " + context }] },
+          contents: chatHistory
         })
       })
       const data = await response.json()
-      const reply = data.content?.[0]?.text || "Lo siento, hubo un error."
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Lo siento, hubo un error."
       setMessages(prev => [...prev, { role: "assistant", content: reply }])
     } catch (e) {
       setMessages(prev => [...prev, { role: "assistant", content: "Error conectando con el asistente." }])
