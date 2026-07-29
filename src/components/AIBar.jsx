@@ -47,7 +47,7 @@ export default function AIBar({ userName }) {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + import.meta.env.VITE_GROQ_API_KEY },
         body: JSON.stringify({
-          model: "llama3-8b-8192",
+          model: "llama-3.3-70b-versatile",
           messages: [
             { role: "system", content: "Eres un asesor financiero personal. Responde en maximo 3 oraciones, directo y en espanol. Datos del usuario: " + context },
             { role: "user", content: question }
