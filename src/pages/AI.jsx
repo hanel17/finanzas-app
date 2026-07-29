@@ -63,7 +63,7 @@ export default function AI() {
       const context = await getFinancialContext()
       
       const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
+        model: "gemini-2.5-flash",
         systemInstruction: "Eres un asesor financiero personal experto. Da consejos específicos y accionables basados en los datos del usuario. Sé directo y amigable. Habla en español dominicano. " + context
       })
 
