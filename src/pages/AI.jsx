@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Send, Bot } from 'lucide-react'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const SUGGESTIONS = [
   "¿En qué estoy gastando más?",
@@ -58,28 +57,41 @@ export default function AI() {
     setLoading(true)
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY
-      const genAI = new GoogleGenerativeAI(apiKey)
+      const apiKey = import.meta.env.VITE_GROQ_API_KEY
       const context = await getFinancialContext()
       
-      const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash-latest",
-        systemInstruction: "Eres un asesor financiero personal experto. Da consejos específicos y accionables basados en los datos del usuario. Sé directo y amigable. Habla en español dominicano. " + context
+      const payloadMessages = [
+        {
+          role: "system",
+          content: "Eres un asesor financiero personal experto. Da consejos específicos y accionables basados en los datos del usuario. Sé directo y amigable. Habla en español dominicano. " + context
+        },
+        ...newMessages.map(m => ({
+          role: m.role === "assistant" ? "assistant" : "user",
+          content: m.content
+        }))
+      ]
+
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: payloadMessages,
+          temperature: 0.7
+        })
       })
 
-      const history = newMessages.slice(1, -1).map(m => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }]
-      }))
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error?.message || "Error al conectar con Groq")
 
-      const chat = model.startChat({ history })
-      const result = await chat.sendMessage(q)
-      const responseText = result.response.text()
-
+      const responseText = data.choices[0].message.content
       setMessages(prev => [...prev, { role: "assistant", content: responseText }])
     } catch (e) {
-      console.error("Error con Gemini SDK:", e)
-      setMessages(prev => [...prev, { role: "assistant", content: "Lo siento, hubo un error al consultar a Gemini." }])
+      console.error("Error con Groq API:", e)
+      setMessages(prev => [...prev, { role: "assistant", content: "Lo siento, hubo un error al consultar al asistente financiero." }])
     } finally {
       setLoading(false)
     }
