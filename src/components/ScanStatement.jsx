@@ -88,7 +88,8 @@ export default function ScanStatement({ onClose, onSaved }) {
       setMovements(enriched)
       setStep("preview")
     } catch(e) {
-      showToast("Error analizando el archivo", "error")
+      console.error("Scanner error:", e)
+      showToast("Error: " + e.message, "error")
       setStep("upload")
     }
     setAnalyzing(false)
