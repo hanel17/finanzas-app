@@ -49,13 +49,13 @@ export default function ScanStatement({ onClose, onSaved }) {
 
     try {
       const text = await readFileAsText(file)
-      const context = "Analiza este estado de cuenta bancario y extrae TODOS los movimientos. Para cada movimiento devuelve un JSON array con objetos que tengan: date (YYYY-MM-DD), description, amount (numero positivo), type (income o expense), category. Texto del estado: " + text.slice(0, 8000)
+      const context = `Extrae los movimientos financieros de este texto. Responde SOLO con un JSON array valido. Cada objeto debe tener: date (YYYY-MM-DD), description (string), amount (numero), type (income o expense), category (string). Texto: ${text.slice(0, 3000)}`
       
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + import.meta.env.VITE_GROQ_API_KEY },
         body: JSON.stringify({
-          model: "llama3-8b-8192",
+          model: "llama-3.3-70b-versatile",
           messages: [
             { role: "system", content: "Eres un extractor de datos financieros. Responde SOLO con un JSON array valido, sin texto adicional, sin markdown." },
             { role: "user", content: context }
