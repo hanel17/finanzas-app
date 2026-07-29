@@ -14,6 +14,7 @@ export default function AIBar({ userName }) {
   const { user } = useAuth()
   const [input, setInput] = useState("")
   const [reply, setReply] = useState(null)
+  const [asked, setAsked] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const getContext = async () => {
