@@ -1,7 +1,19 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { Upload, CheckCircle2, AlertCircle, Sparkles, Loader2, RefreshCw } from 'lucide-react'
+
+// Carga dinamica de librerias de lectura en el cliente
+const loadScript = (src) => {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) return resolve()
+    const s = document.createElement('script')
+    s.src = src
+    s.onload = resolve
+    s.onerror = reject
+    document.head.appendChild(s)
+  })
+}
 
 export default function ScanStatement({ onClose, onSaved }) {
   const { user } = useAuth()
@@ -10,36 +22,70 @@ export default function ScanStatement({ onClose, onSaved }) {
   const [activeTab, setActiveTab] = useState('DOP')
   const [result, setResult] = useState(null)
   const [errorMsg, setErrorMsg] = useState(null)
+  const [statusText, setStatusText] = useState('')
 
-  // Metodo robusto para llamar a Groq evitando errores 400 / JSON Generation
-  const processTextWithGroq = async (rawContent) => {
+  useEffect(() => {
+    // Precargar libreria PDF.js para lectura local
+    loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js').catch(() => {})
+  }, [])
+
+  // Extraer texto de PDF
+  const readPdfText = async (file) => {
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js')
+    const pdfjsLib = window['pdfjs-dist/build/pdf']
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+    
+    const arrayBuffer = await file.arrayBuffer()
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+    let fullText = ""
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i)
+      const textContent = await page.getTextContent()
+      const pageText = textContent.items.map(item => item.str).join(" ")
+      fullText += `\n--- PAGINA ${i} ---\n` + pageText
+    }
+    return fullText
+  }
+
+  // Extraer texto de Imagen con OCR Tesseract
+  const readImageText = async (file) => {
+    await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js')
+    const worker = await window.Tesseract.createWorker('spa')
+    const ret = await worker.recognize(file)
+    await worker.terminate()
+    return ret.data.text
+  }
+
+  const processTextWithGroq = async (extractedText) => {
     const apiKey = import.meta.env.VITE_GROQ_API_KEY
     if (!apiKey) {
-      throw new Error("No se encontró VITE_GROQ_API_KEY en el entorno.")
+      throw new Error("No se encontró la clave VITE_GROQ_API_KEY.")
     }
 
-    const systemPrompt = `You are a financial statement JSON parser. You ONLY respond with raw JSON matching the requested structure.
-CRITICAL INSTRUCTIONS:
-1. Parse the financial entries into JSON.
-2. Ensure every transaction has a "currency" ("DOP" or "USD"), "type" ("expense" or "income"), "category", "amount" (number), "description", "date" (YYYY-MM-DD).
-3. Sum up the expenses and incomes in the "summary" object.
+    const systemPrompt = `You are a strict financial transaction extractor. Analyze the provided text from bank statements or receipts.
+INSTRUCTIONS:
+1. Extract ALL listed transactions without skipping any item.
+2. Group items by currency ("DOP" or "USD").
+3. Identify type ("expense" or "income").
+4. Assign category ("Supermercado", "Alimentación", "Servicios", "Suscripciones", "Transporte", "Abono a Tarjeta", "Otros").
 
-JSON OUTPUT STRUCTURE:
+Return standard JSON:
 {
   "summary": {
-    "dop_expense": 20602.32,
-    "dop_income": 33438.82,
-    "usd_expense": 18.46,
-    "usd_income": 38.46
+    "dop_expense": 0.00,
+    "dop_income": 0.00,
+    "usd_expense": 0.00,
+    "usd_income": 0.00
   },
   "transactions": [
     {
       "id": "1",
-      "date": "2026-06-15",
-      "description": "MI GUSTO MELLA CHARLES",
-      "amount": 220,
+      "date": "YYYY-MM-DD",
+      "description": "Merchant Name",
+      "amount": 100.00,
       "type": "expense",
-      "category": "Alimentación",
+      "category": "Supermercado",
       "currency": "DOP"
     }
   ]
@@ -57,75 +103,66 @@ JSON OUTPUT STRUCTURE:
         temperature: 0.1,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Please convert this document content into the required JSON format:
+          { role: 'user', content: `Extract ALL transactions from this document text:
 
-${rawContent}` }
+${extractedText.slice(0, 20000)}` }
         ]
       })
     })
 
     const data = await response.json()
-
     if (!response.ok) {
-      console.error("Error Groq API:", data)
-      throw new Error(data.error?.message || "Error al generar JSON con Groq.")
+      throw new Error(data.error?.message || "Error procesando respuesta con Groq LLM.")
     }
 
-    let parsedData = {}
-    try {
-      parsedData = JSON.parse(data.choices[0]?.message?.content || '{}')
-    } catch (e) {
-      throw new Error("Respuesta inválida del servidor AI.")
+    let parsed = JSON.parse(data.choices[0]?.message?.content || '{}')
+    
+    if (!parsed.transactions || parsed.transactions.length === 0) {
+      throw new Error("No se lograron detectar transacciones legibles en el documento.")
     }
 
-    // Asegurar estructura base si vino vacía
-    if (!parsedData.transactions || parsedData.transactions.length === 0) {
-      // Fallback a transacciones reales parseadas del estado
-      parsedData = {
-        summary: { dop_expense: 20602.32, dop_income: 33438.82, usd_expense: 18.46, usd_income: 38.46 },
-        transactions: [
-          { id: '1', date: '2026-06-15', description: 'MI GUSTO MELLA CHARLES', amount: 220, type: 'expense', category: 'Alimentación', currency: 'DOP' },
-          { id: '2', date: '2026-06-24', description: 'BRAVO CHARLES DE GAULLE', amount: 4665, type: 'expense', category: 'Supermercado', currency: 'DOP' },
-          { id: '3', date: '2026-06-26', description: 'PAGOS TARJETAS INTERNET', amount: 28000, type: 'income', category: 'Abono a Tarjeta', currency: 'DOP' },
-          { id: '4', date: '2026-07-10', description: 'PAGOS TARJETAS INTERNET', amount: 5100, type: 'income', category: 'Abono a Tarjeta', currency: 'DOP' },
-          { id: '5', date: '2026-07-13', description: 'DEVOLUCION 7% BRAVO JUNIO', amount: 326.55, type: 'income', category: 'Reembolsos / Cashback', currency: 'DOP' },
-          { id: '6', date: '2026-06-25', description: 'APPLE.COM BILL', amount: 0.99, type: 'expense', category: 'Suscripciones', currency: 'USD' },
-          { id: '7', date: '2026-07-08', description: 'SPOTIFY, STOCKHOLM', amount: 6.49, type: 'expense', category: 'Suscripciones', currency: 'USD' },
-          { id: '8', date: '2026-07-10', description: 'NETFLIX.COM', amount: 9.99, type: 'expense', category: 'Suscripciones', currency: 'USD' }
-        ]
-      }
-    }
-
-    parsedData.transactions = parsedData.transactions.map((t, idx) => ({
+    parsed.transactions = parsed.transactions.map((t, idx) => ({
       ...t,
-      id: t.id || `tx_${idx}_${Date.now()}`,
+      id: `tx_${idx}_${Date.now()}`,
       selected: true
     }))
 
-    return parsedData
+    return parsed
   }
 
   const handleFileUpload = async (e) => {
     const selectedFile = e.target.files?.[0]
     if (!selectedFile) return
+    
     setAnalyzing(true)
     setErrorMsg(null)
+    setStatusText('Leyendo archivo...')
 
     try {
-      let contentToProcess = ""
-      if (selectedFile.type.includes("text") || selectedFile.name.endsWith(".txt")) {
-        contentToProcess = await selectedFile.text()
+      let rawText = ""
+      if (selectedFile.type.includes('pdf') || selectedFile.name.endsWith('.pdf')) {
+        setStatusText('Extrayendo texto del PDF...')
+        rawText = await readPdfText(selectedFile)
+      } else if (selectedFile.type.includes('image')) {
+        setStatusText('Ejecutando OCR en la imagen...')
+        rawText = await readImageText(selectedFile)
       } else {
-        contentToProcess = `Document: ${selectedFile.name} (${selectedFile.type}, size: ${selectedFile.size} bytes)`
+        rawText = await selectedFile.text()
       }
 
-      const parsedResult = await processTextWithGroq(contentToProcess)
+      if (!rawText.trim()) {
+        throw new Error("El archivo no contiene texto legible.")
+      }
+
+      setStatusText('Analizando transacciones con IA Groq...')
+      const parsedResult = await processTextWithGroq(rawText)
       setResult(parsedResult)
     } catch (err) {
       console.error(err)
       setErrorMsg(err.message || "Error procesando el documento.")
     } finally {
       setAnalyzing(false)
+      setStatusText('')
     }
   }
 
@@ -143,10 +180,8 @@ ${rawContent}` }
     }))
   }
 
-  // Guardado real en Supabase
   const handleSave = async () => {
     if (!result) return
-    
     const selectedTxs = result.transactions.filter(t => t.selected)
     
     if (selectedTxs.length === 0) {
@@ -157,12 +192,13 @@ ${rawContent}` }
     setSaving(true)
     setErrorMsg(null)
 
+    // Formato normalizado compatible con esquemas standard Supabase
     const payload = selectedTxs.map(t => ({
-      user_id: user.id,
+      user_id: user?.id,
       date: t.date || new Date().toISOString().split('T')[0],
-      description: t.description,
-      amount: Number(t.amount),
-      type: t.type,
+      description: t.description || 'Gasto escaneado',
+      amount: Math.abs(Number(t.amount)),
+      type: t.type === 'income' ? 'income' : 'expense',
       category: t.category || 'Otros',
       currency: t.currency || 'DOP'
     }))
@@ -173,17 +209,22 @@ ${rawContent}` }
         .insert(payload)
 
       if (error) {
-        setErrorMsg("Error guardando en Supabase: " + error.message)
-        setSaving(false)
-        return
+        // En caso de que la tabla 'transactions' no tenga la columna 'currency', reenviamos sin ella
+        if (error.message.includes('currency')) {
+          const fallbackPayload = payload.map(({ currency, ...rest }) => rest)
+          const { error: errFallback } = await supabase.from('transactions').insert(fallbackPayload)
+          if (errFallback) throw errFallback
+        } else {
+          throw error
+        }
       }
 
       setSaving(false)
       if (onSaved) onSaved()
       onClose()
     } catch (err) {
-      console.error(err)
-      setErrorMsg("Error inesperado al conectar con Supabase.")
+      console.error("Error guardando:", err)
+      setErrorMsg("Error guardando en Supabase: " + (err.message || "Verifique los permisos / columnas."))
       setSaving(false)
     }
   }
@@ -195,7 +236,6 @@ ${rawContent}` }
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 16, width: '100%', maxWidth: 700, padding: 24, color: '#fff', maxHeight: '90vh', overflowY: 'auto' }}>
         
-        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
             <Sparkles size={20} color="#818cf8" /> Escanear Estado / Recibo
@@ -209,26 +249,24 @@ ${rawContent}` }
           </div>
         )}
 
-        {/* Formulario de Carga */}
         {!result && (
           <div style={{ border: '2px dashed #334155', borderRadius: 12, padding: 40, textAlign: 'center', background: '#1e293b40', cursor: 'pointer', position: 'relative' }}>
             <input type="file" accept=".pdf,image/*,.txt" onChange={handleFileUpload} disabled={analyzing} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
             {analyzing ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                 <Loader2 size={32} color="#818cf8" className="animate-spin" />
-                <p style={{ margin: 0, fontWeight: 500 }}>Procesando documento con IA...</p>
+                <p style={{ margin: 0, fontWeight: 500 }}>{statusText || 'Procesando documento...'}</p>
               </div>
             ) : (
               <div>
                 <Upload size={32} color="#818cf8" style={{ marginBottom: 12 }} />
-                <p style={{ margin: 0, fontWeight: 500 }}>Sube tu estado de cuenta, factura o recibo</p>
-                <span style={{ fontSize: 12, color: '#64748b' }}>La IA identificará los consumos y abonos automáticamente</span>
+                <p style={{ margin: 0, fontWeight: 500 }}>Sube tu estado de cuenta (PDF / Imagen)</p>
+                <span style={{ fontSize: 12, color: '#64748b' }}>Se extraerán todos los consumos y abonos reales</span>
               </div>
             )}
           </div>
         )}
 
-        {/* Resultados */}
         {result && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             
@@ -241,7 +279,7 @@ ${rawContent}` }
                     background: activeTab === 'DOP' ? '#4f46e5' : '#1e293b', color: activeTab === 'DOP' ? '#fff' : '#94a3b8'
                   }}
                 >
-                  🇩🇴 Pesos (DOP)
+                  🇩🇴 Pesos (DOP) ({result.transactions.filter(t => t.currency === 'DOP').length})
                 </button>
                 <button
                   onClick={() => setActiveTab('USD')}
@@ -250,7 +288,7 @@ ${rawContent}` }
                     background: activeTab === 'USD' ? '#4f46e5' : '#1e293b', color: activeTab === 'USD' ? '#fff' : '#94a3b8'
                   }}
                 >
-                  🇺🇸 Dólares (USD)
+                  🇺🇸 Dólares (USD) ({result.transactions.filter(t => t.currency === 'USD').length})
                 </button>
               </div>
 
@@ -262,24 +300,7 @@ ${rawContent}` }
               </button>
             </div>
 
-            {/* Resumen */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, background: '#1e293b60', padding: 12, borderRadius: 10 }}>
-              <div>
-                <span style={{ fontSize: 11, color: '#94a3b8' }}>Gastos en {activeTab}</span>
-                <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#f43f5e' }}>
-                  {activeTab === 'DOP' ? 'RD$' : '$'}{activeTab === 'DOP' ? (result.summary?.dop_expense || 0).toLocaleString() : (result.summary?.usd_expense || 0).toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <span style={{ fontSize: 11, color: '#94a3b8' }}>Abonos / Ingresos en {activeTab}</span>
-                <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#10b981' }}>
-                  {activeTab === 'DOP' ? 'RD$' : '$'}{activeTab === 'DOP' ? (result.summary?.dop_income || 0).toLocaleString() : (result.summary?.usd_income || 0).toLocaleString()}
-                </p>
-              </div>
-            </div>
-
-            {/* Lista de Transacciones */}
-            <div style={{ maxHeight: 280, overflowY: 'auto', border: '1px solid #334155', borderRadius: 8 }}>
+            <div style={{ maxHeight: 320, overflowY: 'auto', border: '1px solid #334155', borderRadius: 8 }}>
               {currentTxs.length === 0 ? (
                 <p style={{ padding: 20, textAlign: 'center', color: '#64748b', fontSize: 13 }}>No hay movimientos en esta moneda.</p>
               ) : (
@@ -301,10 +322,9 @@ ${rawContent}` }
               )}
             </div>
 
-            {/* Acciones */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
               <button onClick={() => setResult(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <RefreshCw size={14} /> Reintentar otro
+                <RefreshCw size={14} /> Subir otro documento
               </button>
               
               <div style={{ display: 'flex', gap: 10 }}>
@@ -313,7 +333,7 @@ ${rawContent}` }
                 </button>
                 <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', background: '#4f46e5', border: 'none', color: '#fff', borderRadius: 8, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
                   {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                  {saving ? "Guardando..." : "Guardar Seleccionados"}
+                  {saving ? "Guardando..." : `Guardar Seleccionados (${result.transactions.filter(t=>t.selected).length})`}
                 </button>
               </div>
             </div>
