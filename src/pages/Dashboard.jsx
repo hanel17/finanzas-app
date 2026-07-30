@@ -23,7 +23,7 @@ export default function Dashboard() {
       supabase.from('profiles').select('*').eq('id', user.id).single(),
       supabase.from('credit_cards').select('*').eq('user_id', user.id),
       supabase.from('fixed_expenses').select('*').eq('user_id', user.id),
-      supabase.from('transactions').select('*').eq('user_id', user.id).order('date', { ascending: false }).limit(10),
+      supabase.from('transactions').select('*').eq('user_id', user.id).order('date', { ascending: false }),
       supabase.from('savings_goals').select('*').eq('user_id', user.id),
     ])
     setData({ profile: p.data, cards: c.data||[], expenses: e.data||[], transactions: t.data||[], goals: g.data||[] })
@@ -47,10 +47,12 @@ export default function Dashboard() {
   const monthIncome = monthTx.filter(t => t.type==='income').reduce((s,t)=>s+Number(t.amount),0)
   const available = totalIncome - totalFixed
 
-  const pieData = expenses.reduce((acc,e) => {
-    const f = acc.find(a => a.name===e.category)
-    if(f) f.value+=Number(e.amount)
-    else acc.push({name:e.category, value:Number(e.amount)})
+  const sourceForPie = expenses.length > 0 ? expenses : transactions.filter(t => t.type === 'expense')
+  const pieData = sourceForPie.reduce((acc, e) => {
+    const cat = e.category || 'Otros'
+    const f = acc.find(a => a.name === cat)
+    if (f) f.value += Number(e.amount || 0)
+    else acc.push({ name: cat, value: Number(e.amount || 0) })
     return acc
   }, [])
 

@@ -198,7 +198,7 @@ ${extractedText.slice(0, 20000)}` }
       date: t.date || new Date().toISOString().split('T')[0],
       description: t.description || 'Gasto escaneado',
       amount: Math.abs(Number(t.amount)),
-      type: t.type === 'income' ? 'income' : 'expense',
+      type: t.type === 'income' ? 'income' : 'expense', is_fixed: false,
       category: t.category || 'Otros',
       currency: t.currency || 'DOP'
     }))
