@@ -54,6 +54,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadData()
+    // Reload when user comes back to the tab or page
+    const handleFocus = () => loadData()
+    const handleVisibility = () => { if (!document.hidden) loadData() }
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [loadData])
 
   const executeAction = async (action) => {
