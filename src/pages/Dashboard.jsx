@@ -10,12 +10,18 @@ import { useNavigate } from 'react-router-dom'
 
 const COLORS = ['#00d084','#4cc9f0','#ffd60a','#ff4d6d','#7b2fff','#f77f00','#06d6a0','#e63946']
 
+const fmt = (n) => Math.round(n || 0).toLocaleString('es-DO')
+const fmt2 = (n) => Number(n || 0).toLocaleString('es-DO', {minimumFractionDigits: 0, maximumFractionDigits: 2})
+
 export default function Dashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [showScan, setShowScan] = useState(false)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [showSavingsModal, setShowSavingsModal] = useState(false)
+  const [savingsAmount, setSavingsAmount] = useState('')
+  const [savingsDesc, setSavingsDesc] = useState('')
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiReply, setAiReply] = useState(null)
   const [aiLoading, setAiLoading] = useState(false)
@@ -143,6 +149,24 @@ export default function Dashboard() {
       return 'Error: '+e.message
     }
     return 'Accion no reconocida: '+action.type
+  }
+
+  const handleAddSavings = async () => {
+    if (!savingsAmount) return
+    const { data: authData } = await supabase.auth.getUser()
+    const uid = authData?.user?.id || user?.id
+    if (!uid) return
+    await supabase.from('savings').insert({
+      user_id: uid,
+      amount: Number(savingsAmount),
+      description: savingsDesc || 'Ahorro',
+      type: 'deposit',
+      date: new Date().toISOString().split('T')[0]
+    })
+    setSavingsAmount('')
+    setSavingsDesc('')
+    setShowSavingsModal(false)
+    loadData()
   }
 
   const askAI = async (q) => {
@@ -343,11 +367,20 @@ ${recentTx || 'Sin transacciones'}
             <span style={{ fontSize: 12, color: '#94a3b8' }}>¿Cuánto dinero tengo hoy?</span>
           </div>
           <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#10b981', letterSpacing: '-0.5px' }}>
-            {currSymbol}{(metrics?.moneyInHand || 0).toLocaleString('es-DO', {maximumFractionDigits: 0})}
+            {currSymbol}{fmt(metrics?.moneyInHand)}
           </h2>
           <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
             Ingresos + saldo anterior
           </div>
+          {metrics?.cycleSavingsOut > 0 && (
+            <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 2 }}>
+              🏦 -{currSymbol}{fmt(metrics?.cycleSavingsOut)} enviado a ahorros
+            </div>
+          )}
+          <button onClick={() => setShowSavingsModal(true)}
+            style={{ marginTop: 10, width: '100%', background: '#064e3b', color: '#10b981', border: '1px solid #10b98140', borderRadius: 8, padding: '6px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            🏦 Enviar a ahorros
+          </button>
         </div>
 
         <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: 18, borderRadius: 16 }}>
@@ -396,7 +429,7 @@ ${recentTx || 'Sin transacciones'}
             <span style={{ fontSize: 12, color: '#94a3b8' }}>¿Cuánto ya gasté?</span>
           </div>
           <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#f43f5e', letterSpacing: '-0.5px' }}>
-            {currSymbol}{(metrics?.cycleSpent || 0).toLocaleString('es-DO', {maximumFractionDigits: 0})}
+            {currSymbol}{fmt(metrics?.cycleSpent)}
           </h2>
           <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
             Gastos realizados este ciclo
@@ -409,10 +442,10 @@ ${recentTx || 'Sin transacciones'}
             <span style={{ fontSize: 12, color: '#94a3b8' }}>¿Cuánto puedo gastar?</span>
           </div>
           <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#38bdf8', letterSpacing: '-0.5px' }}>
-            {currSymbol}{(metrics?.moneyAvailable || 0).toLocaleString('es-DO', {maximumFractionDigits: 0})}
+            {currSymbol}{fmt(metrics?.moneyAvailable)}
           </h2>
           <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
-            {currSymbol}{(metrics?.dailyBudget || 0).toLocaleString('es-DO', {maximumFractionDigits: 0})}/día por {currentCycle?.daysRemaining} días
+            {currSymbol}{fmt(metrics?.dailyBudget)}/día · {currentCycle?.daysRemaining} días
           </div>
         </div>
       </div>
@@ -504,6 +537,37 @@ ${recentTx || 'Sin transacciones'}
       )}
       {showQuickAdd && (
         <QuickAdd onClose={() => setShowQuickAdd(false)} onSaved={loadData} />
+      )}
+      {showSavingsModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}
+          onClick={e => e.target === e.currentTarget && setShowSavingsModal(false)}>
+          <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 20, padding: 28, width: 'min(360px, 90vw)', animation: 'slideUp .25s ease' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>🏦 Enviar a ahorros</h3>
+            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>Este dinero saldrá de tu dinero en mano y se guardará en tus ahorros.</p>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 6 }}>Monto (RD$)</label>
+              <input type="number" value={savingsAmount} onChange={e => setSavingsAmount(e.target.value)}
+                placeholder="5000" autoFocus
+                style={{ width: '100%', padding: '12px 14px', fontSize: 20, fontWeight: 700, background: '#1e293b', border: '1px solid #334155', borderRadius: 10, color: '#fff', outline: 'none' }} />
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 6 }}>Descripción (opcional)</label>
+              <input value={savingsDesc} onChange={e => setSavingsDesc(e.target.value)}
+                placeholder="Fondo de emergencia, vacaciones..."
+                style={{ width: '100%', padding: '10px 14px', fontSize: 14, background: '#1e293b', border: '1px solid #334155', borderRadius: 10, color: '#fff', outline: 'none' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setShowSavingsModal(false)}
+                style={{ flex: 1, padding: 12, background: '#1e293b', color: '#94a3b8', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 14 }}>
+                Cancelar
+              </button>
+              <button onClick={handleAddSavings} disabled={!savingsAmount}
+                style={{ flex: 2, padding: 12, background: '#10b981', color: '#000', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 14, fontWeight: 700, opacity: savingsAmount ? 1 : 0.5 }}>
+                Guardar RD${savingsAmount ? fmt(Number(savingsAmount)) : '0'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       <button onClick={() => setShowQuickAdd(true)} style={{ position:'fixed', bottom:24, right:24, width:52, height:52, borderRadius:'50%', background:'#10b981', color:'#000', fontSize:24, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 4px 20px rgba(16,185,129,0.4)', zIndex:200, border:'none', cursor:'pointer' }}>
         <Plus size={22} />
