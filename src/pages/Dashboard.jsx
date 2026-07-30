@@ -63,14 +63,73 @@ export default function Dashboard() {
     setAiLoading(true)
     setAiReply(null)
     try {
-      const cycleContext = `Ciclo actual: ${currentCycle?.formattedRange}. Dias restantes: ${currentCycle?.daysRemaining}. Ingreso del ciclo: RD$${metrics?.totalIncome}. Gastos realizados: RD$${metrics?.cycleSpent}. Dinero libre: RD$${metrics?.reallyAvailable}. Gasto diario recomendado: RD$${metrics?.dailyRecommended}.`
+      // Load full financial data
+      const [profileRes, cardsRes, expensesRes, txRes, goalsRes] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        supabase.from('credit_cards').select('*').eq('user_id', user.id),
+        supabase.from('fixed_expenses').select('*').eq('user_id', user.id),
+        supabase.from('transactions').select('*').eq('user_id', user.id).order('date', { ascending: false }).limit(100),
+        supabase.from('savings_goals').select('*').eq('user_id', user.id),
+      ])
+
+      const profile = profileRes.data || {}
+      const cards = cardsRes.data || []
+      const expenses = expensesRes.data || []
+      const transactions = txRes.data || []
+      const goals = goalsRes.data || []
+
+      // Build category summary
+      const byCat = transactions.filter(t => t.type === 'expense').reduce((acc, t) => {
+        acc[t.category] = (acc[t.category] || 0) + Number(t.amount)
+        return acc
+      }, {})
+
+      // Recent transactions detail
+      const recentTx = transactions.slice(0, 30).map(t =>
+        `${t.date} | ${t.type === 'income' ? '+' : '-'}RD$${t.amount} | ${t.description} | ${t.category}`
+      ).join('\n')
+
+      const fullContext = `
+=== PERFIL ===
+Nombre: ${profile.full_name || 'Usuario'}
+Ingreso mensual titular: RD$${profile.monthly_income || 0}
+Ingreso pareja: RD$${profile.spouse_income || 0}
+Ingreso total: RD$${(profile.monthly_income || 0) + (profile.spouse_income || 0)}
+
+=== CICLO ACTUAL ===
+Período: ${currentCycle?.formattedRange}
+Días transcurridos: ${currentCycle?.daysElapsed}
+Días restantes: ${currentCycle?.daysRemaining}
+Ingreso del ciclo: RD$${metrics?.totalIncome}
+Gastos comprometidos (fijos): RD$${metrics?.committedMoney}
+Gastos realizados: RD$${metrics?.cycleSpent}
+Dinero realmente libre: RD$${metrics?.reallyAvailable}
+Gasto diario recomendado: RD$${metrics?.dailyRecommended}
+
+=== TARJETAS DE CRÉDITO ===
+${cards.map(c => `${c.bank_name} ${c.card_name}: Balance RD$${c.current_balance} de RD$${c.credit_limit} (${((c.current_balance/c.credit_limit)*100).toFixed(0)}%) | Vence: ${c.due_date} | Mínimo: RD$${c.minimum_payment} | Tasa: ${c.interest_rate}%`).join('\n') || 'Sin tarjetas'}
+
+=== GASTOS FIJOS MENSUALES ===
+${expenses.map(e => `${e.name}: RD$${e.amount} (${e.category})${e.due_day ? ' | Día ' + e.due_day : ''}`).join('\n') || 'Sin gastos fijos'}
+
+=== METAS DE AHORRO ===
+${goals.map(g => `${g.name}: RD$${g.current_amount} de RD$${g.target_amount} (${((g.current_amount/g.target_amount)*100).toFixed(0)}%) | Meta: ${g.target_date}`).join('\n') || 'Sin metas'}
+
+=== GASTOS POR CATEGORÍA (histórico) ===
+${Object.entries(byCat).sort((a,b) => b[1]-a[1]).map(([k,v]) => `${k}: RD$${v.toLocaleString()}`).join('\n') || 'Sin datos'}
+
+=== ÚLTIMAS 30 TRANSACCIONES ===
+${recentTx || 'Sin transacciones'}
+      `
+
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + import.meta.env.VITE_GROQ_API_KEY },
         body: JSON.stringify({
           model: 'llama-3.3-70b-versatile',
+          max_tokens: 500,
           messages: [
-            { role: 'system', content: 'Eres un asesor financiero personal. Responde en maximo 3 oraciones, directo y en espanol dominicano. ' + cycleContext },
+            { role: 'system', content: 'Eres un asesor financiero personal experto en finanzas dominicanas. Tienes acceso completo a todos los datos financieros del usuario. Da consejos especificos, usa los montos exactos, se directo y amigable. Responde en espanol dominicano natural. Maximo 4 oraciones a menos que te pidan un analisis detallado. ' + fullContext },
             { role: 'user', content: question }
           ]
         })
@@ -78,6 +137,7 @@ export default function Dashboard() {
       const data = await res.json()
       setAiReply(data.choices?.[0]?.message?.content || 'Sin respuesta.')
     } catch(e) {
+      console.error('AI error:', e)
       setAiReply('Error conectando con el asistente.')
     }
     setAiLoading(false)
