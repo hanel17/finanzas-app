@@ -110,7 +110,7 @@ export default function QuickAdd({ onClose, onSaved }) {
           <div style={{ display: 'flex', background: 'var(--bg3)', borderRadius: 10, padding: 3, marginBottom: 20, gap: 3 }}>
             <button style={tabStyle('expense')} onClick={() => setTab('expense')}>↓ Gasto</button>
             <button style={tabStyle('income')} onClick={() => setTab('income')}>↑ Ingreso</button>
-            <button style={tabStyle('fixed')} onClick={() => setTab('fixed')}>📌 Fijo</button>
+            <button style={tabStyle('fixed')} onClick={() => setTab('fixed')}>📌 Compromiso</button>
           </div>
 
           {/* Amount */}
@@ -176,7 +176,7 @@ export default function QuickAdd({ onClose, onSaved }) {
 
           <button onClick={handleSave} disabled={loading || !amount || !description}
             style={{ width: '100%', padding: 14, fontSize: 15, fontWeight: 600, background: tab === 'income' ? '#10b981' : tab === 'fixed' ? '#f59e0b' : 'var(--green)', color: '#000', border: 'none', borderRadius: 10, cursor: 'pointer', opacity: (!amount || !description) ? 0.5 : 1 }}>
-            {loading ? 'Guardando...' : tab === 'fixed' ? 'Agregar gasto fijo 📌' : tab === 'income' ? 'Registrar ingreso ↑' : 'Registrar gasto ↓'}
+            {loading ? 'Guardando...' : tab === 'fixed' ? 'Agregar compromiso 📌' : tab === 'income' ? 'Registrar ingreso ↑' : 'Registrar gasto ↓'}
           </button>
         </div>
       </div>

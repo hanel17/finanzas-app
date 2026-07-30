@@ -336,7 +336,7 @@ ${recentTx || 'Sin transacciones'}
             <span style={{ fontSize: 12, color: '#94a3b8' }}>¿Cuánto dinero tengo hoy?</span>
           </div>
           <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#10b981', letterSpacing: '-0.5px' }}>
-            {currSymbol}{(metrics?.moneyInHand || 0).toLocaleString('es-DO', {minimumFractionDigits: 0, maximumFractionDigits: 2})}
+            {currSymbol}{(metrics?.moneyInHand || 0).toLocaleString('es-DO', {maximumFractionDigits: 0})}
           </h2>
           <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
             Ingresos + saldo anterior
@@ -349,7 +349,7 @@ ${recentTx || 'Sin transacciones'}
             <span style={{ fontSize: 12, color: '#94a3b8' }}>¿Cuánto debo pagar?</span>
           </div>
           <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#f59e0b', letterSpacing: '-0.5px' }}>
-            {currSymbol}{(metrics?.totalUnpaid || 0).toLocaleString('es-DO', {minimumFractionDigits: 0, maximumFractionDigits: 2})}
+            {currSymbol}{(metrics?.totalUnpaid || 0).toLocaleString('es-DO', {maximumFractionDigits: 0})}
           </h2>
           <div style={{ fontSize: 11, color: '#475569', marginTop: 4, marginBottom: 8 }}>
             {metrics?.unpaidCommitments?.length || 0} compromisos pendientes
@@ -389,7 +389,7 @@ ${recentTx || 'Sin transacciones'}
             <span style={{ fontSize: 12, color: '#94a3b8' }}>¿Cuánto ya gasté?</span>
           </div>
           <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#f43f5e', letterSpacing: '-0.5px' }}>
-            {currSymbol}{(metrics?.cycleSpent || 0).toLocaleString('es-DO', {minimumFractionDigits: 0, maximumFractionDigits: 2})}
+            {currSymbol}{(metrics?.cycleSpent || 0).toLocaleString('es-DO', {maximumFractionDigits: 0})}
           </h2>
           <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
             Gastos realizados este ciclo
@@ -402,10 +402,10 @@ ${recentTx || 'Sin transacciones'}
             <span style={{ fontSize: 12, color: '#94a3b8' }}>¿Cuánto puedo gastar?</span>
           </div>
           <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#38bdf8', letterSpacing: '-0.5px' }}>
-            {currSymbol}{(metrics?.moneyAvailable || 0).toLocaleString('es-DO', {minimumFractionDigits: 0, maximumFractionDigits: 2})}
+            {currSymbol}{(metrics?.moneyAvailable || 0).toLocaleString('es-DO', {maximumFractionDigits: 0})}
           </h2>
           <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
-            {currSymbol}{(metrics?.dailyBudget || 0).toLocaleString('es-DO', {minimumFractionDigits: 0, maximumFractionDigits: 2})}/día por {currentCycle?.daysRemaining} días
+            {currSymbol}{(metrics?.dailyBudget || 0).toLocaleString('es-DO', {maximumFractionDigits: 0})}/día por {currentCycle?.daysRemaining} días
           </div>
         </div>
       </div>
