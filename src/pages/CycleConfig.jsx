@@ -45,8 +45,11 @@ export default function CycleConfig() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     let userId = user?.id
+    console.log("user object:", user)
+    console.log("user?.id:", user?.id)
     if (!userId) {
       const { data } = await supabase.auth.getUser()
+      console.log("getUser result:", data)
       userId = data?.user?.id
     }
     if (!userId) {
