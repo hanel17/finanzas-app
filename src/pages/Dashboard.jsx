@@ -44,8 +44,11 @@ export default function Dashboard() {
   const totalDebt = cards.reduce((s,c) => s+Number(c.current_balance), 0)
   const monthTx = transactions.filter(t => t.date?.startsWith(new Date().toISOString().slice(0,7)))
   const monthExpenses = monthTx.filter(t => t.type==='expense').reduce((s,t)=>s+Number(t.amount),0)
-  const monthIncome = monthTx.filter(t => t.type==='income').reduce((s,t)=>s+Number(t.amount),0)
-  const available = totalIncome - totalFixed
+  // Cálculos dinámicos con respaldo en transacciones reales
+  
+  const displayIncome = totalIncome > 0 ? totalIncome : monthIncome
+  const displayFixed = totalFixed > 0 ? totalFixed : monthExpenses
+  const available = displayIncome - displayFixed
 
   const sourceForPie = expenses.length > 0 ? expenses : transactions.filter(t => t.type === 'expense')
   const pieData = sourceForPie.reduce((acc, e) => {
@@ -97,8 +100,8 @@ export default function Dashboard() {
       <AIBar userName={profile?.full_name?.split(' ')[0]} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-        <StatCard icon={<TrendingUp size={16}/>} label="Ingreso mensual" value={`RD$${totalIncome.toLocaleString()}`} color="var(--green)" sub={`Tú + pareja`} />
-        <StatCard icon={<TrendingDown size={16}/>} label="Gastos fijos" value={`RD$${totalFixed.toLocaleString()}`} color="var(--red)" sub="Este mes" />
+        <StatCard icon={<TrendingUp size={16}/>} label="Ingreso mensual" value={`RD$${displayIncome.toLocaleString()}`} color="var(--green)" sub={`Tú + pareja`} />
+        <StatCard icon={<TrendingDown size={16}/>} label="Gastos fijos" value={`RD$${displayFixed.toLocaleString()}`} color="var(--red)" sub="Este mes" />
         <StatCard icon={<Wallet size={16}/>} label="Deuda tarjetas" value={`RD$${totalDebt.toLocaleString()}`} color="var(--yellow)" sub={`${cards.length} tarjetas`} />
         <StatCard icon={<Target size={16}/>} label="Disponible" value={`RD$${available.toLocaleString()}`} color="var(--blue)" sub="Para metas/ahorro" />
       </div>
