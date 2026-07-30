@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 
@@ -46,19 +46,17 @@ function MainLayout({ children }) {
         <Menu size={22} color="#fff" />
       </button>
 
-      {/* Fondo oscuro (Overlay) cuando el menú está abierto en móvil */}
-      {mobileMenuOpen && (
-        <div 
-          className="mobile-backdrop"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
+      {/* Overlay oscuro */}
+      <div 
+        className={`mobile-backdrop ${mobileMenuOpen ? 'active' : ''}`}
+        onClick={() => setMobileMenuOpen(false)}
+      />
 
-      {/* Sidebar (Fijo en PC / Desplegable lateral en móvil) */}
+      {/* Sidebar / Menú Lateral */}
       <aside className={`sidebar-drawer ${mobileMenuOpen ? 'open' : ''}`}>
         
         {/* Cabecera del Menú */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ background: '#312e81', padding: 8, borderRadius: 10 }}>
               <Wallet size={20} color="#818cf8" />
@@ -79,7 +77,7 @@ function MainLayout({ children }) {
         </div>
 
         {/* Lista de Navegación */}
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, marginTop: 12 }}>
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
           {navItems.map((item) => {
             const isActive = location.pathname === item.path
             return (

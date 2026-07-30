@@ -302,3 +302,95 @@ a { color: var(--green); text-decoration: none; }
     box-sizing: border-box !important;
   }
 }
+
+
+/* ==============================================
+   REGLAS DEL MENÚ RESPONSIVO MÓVIL
+   ============================================== */
+
+.mobile-toggle-btn, .mobile-close-btn, .mobile-backdrop {
+  display: none;
+}
+
+.sidebar-drawer {
+  width: 240px;
+  background: #090d16;
+  border-right: 1px solid #1e293b;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .mobile-toggle-btn {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    position: fixed !important;
+    top: 14px !important;
+    left: 14px !important;
+    z-index: 9999 !important;
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 10px !important;
+    background: #0f172a !important;
+    border: 1px solid #334155 !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
+    cursor: pointer !important;
+  }
+
+  .mobile-close-btn {
+    display: flex !important;
+    background: transparent !important;
+    border: none !important;
+    cursor: pointer !important;
+    padding: 4px !important;
+  }
+
+  .mobile-backdrop {
+    display: block !important;
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(0, 0, 0, 0.75) !important;
+    backdrop-filter: blur(4px) !important;
+    z-index: 9998 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: opacity 0.25s ease !important;
+  }
+
+  .mobile-backdrop.active {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  .sidebar-drawer {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    width: 280px !important;
+    max-width: 85vw !important;
+    height: 100vh !important;
+    z-index: 10000 !important;
+    box-shadow: 10px 0 30px rgba(0,0,0,0.9) !important;
+    transform: translateX(-100%) !important;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+
+  .sidebar-drawer.open {
+    transform: translateX(0) !important;
+  }
+
+  .main-content {
+    width: 100vw !important;
+    padding-top: 60px !important;
+    box-sizing: border-box !important;
+  }
+}
