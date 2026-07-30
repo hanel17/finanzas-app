@@ -56,6 +56,86 @@ export default function Dashboard() {
     loadData()
   }, [loadData])
 
+  const executeAction = async (action) => {
+    try {
+      if (action.type === "update_fixed_expense") {
+        const { data } = await supabase.from('fixed_expenses').select('*').eq('user_id', user.id)
+        const match = (data||[]).find(e => e.name.toLowerCase().includes((action.name||'').toLowerCase()))
+        if (!match) return 'No encontre un gasto fijo llamado: '+action.name
+        const updates = {}
+        if (action.amount !== undefined) updates.amount = Number(action.amount)
+        if (action.due_day !== undefined) updates.due_day = Number(action.due_day)
+        if (action.new_name) updates.name = action.new_name
+        if (action.category) updates.category = action.category
+        await supabase.from('fixed_expenses').update(updates).eq('id', match.id)
+        await loadData()
+        return 'Actualice el gasto fijo '+match.name
+      }
+      if (action.type === "delete_fixed_expense") {
+        const { data } = await supabase.from('fixed_expenses').select('*').eq('user_id', user.id)
+        const match = (data||[]).find(e => e.name.toLowerCase().includes((action.name||'').toLowerCase()))
+        if (!match) return 'No encontre ese gasto fijo.'
+        await supabase.from('fixed_expenses').delete().eq('id', match.id)
+        await loadData()
+        return 'Elimine el gasto fijo: '+match.name
+      }
+      if (action.type === "update_card_balance") {
+        const { data } = await supabase.from('credit_cards').select('*').eq('user_id', user.id)
+        const match = (data||[]).find(c =>
+          c.bank_name.toLowerCase().includes((action.bank||'').toLowerCase()) ||
+          c.card_name.toLowerCase().includes((action.bank||'').toLowerCase())
+        )
+        if (!match) return 'No encontre esa tarjeta.'
+        await supabase.from('credit_cards').update({ current_balance: Number(action.balance) }).eq('id', match.id)
+        await loadData()
+        return 'Actualice el balance de '+match.bank_name+' a RD$'+action.balance
+      }
+      if (action.type === "update_goal") {
+        const { data } = await supabase.from('savings_goals').select('*').eq('user_id', user.id)
+        const match = (data||[]).find(g => g.name.toLowerCase().includes((action.name||'').toLowerCase()))
+        if (!match) return 'No encontre esa meta.'
+        const updates = {}
+        if (action.current_amount !== undefined) updates.current_amount = Number(action.current_amount)
+        if (action.target_amount !== undefined) updates.target_amount = Number(action.target_amount)
+        if (action.target_date) updates.target_date = action.target_date
+        await supabase.from('savings_goals').update(updates).eq('id', match.id)
+        await loadData()
+        return 'Actualice la meta '+match.name
+      }
+      if (action.type === "add_transaction") {
+        await supabase.from('transactions').insert({
+          user_id: user.id,
+          type: action.tx_type || 'expense',
+          amount: Number(action.amount),
+          description: action.description,
+          category: action.category || 'otros',
+          date: action.date || new Date().toISOString().split('T')[0]
+        })
+        await loadData()
+        return 'Registre: '+action.description+' RD$'+action.amount
+      }
+      if (action.type === "delete_transaction") {
+        const { data } = await supabase.from('transactions').select('*').eq('user_id', user.id).order('date', { ascending: false }).limit(50)
+        const match = (data||[]).find(t =>
+          t.description.toLowerCase().includes((action.description||'').toLowerCase()) ||
+          (action.amount && Math.abs(Number(t.amount) - Number(action.amount)) < 10)
+        )
+        if (!match) return 'No encontre esa transaccion.'
+        await supabase.from('transactions').delete().eq('id', match.id)
+        await loadData()
+        return 'Elimine: '+match.description+' RD$'+match.amount
+      }
+      if (action.type === "update_income") {
+        await supabase.from('profiles').update({ monthly_income: Number(action.income) }).eq('id', user.id)
+        await loadData()
+        return 'Actualice tu ingreso a RD$'+action.income
+      }
+    } catch(e) {
+      return 'Error: '+e.message
+    }
+    return 'Accion no reconocida: '+action.type
+  }
+
   const askAI = async (q) => {
     const question = q || aiPrompt.trim()
     if (!question || aiLoading) return
@@ -129,13 +209,25 @@ ${recentTx || 'Sin transacciones'}
           model: 'llama-3.3-70b-versatile',
           max_tokens: 500,
           messages: [
-            { role: 'system', content: 'Eres un asesor financiero personal experto en finanzas dominicanas. Tienes acceso completo a todos los datos financieros del usuario. Da consejos especificos, usa los montos exactos, se directo y amigable. Responde en espanol dominicano natural. Maximo 4 oraciones a menos que te pidan un analisis detallado. ' + fullContext },
+            { role: 'system', content: 'Eres un asistente financiero personal con capacidad de modificar datos. Habla en espanol dominicano directo. Cuando pidan un cambio incluye al FINAL: |||ACTION|||{json}|||END||| Tipos: update_fixed_expense(name,amount?,due_day?,new_name?,category?), delete_fixed_expense(name), update_card_balance(bank,balance), update_goal(name,current_amount?,target_amount?,target_date?), add_transaction(tx_type,amount,description,category,date), delete_transaction(description?,amount?), update_income(income). Sin accion responde normal. ' + fullContext },
             { role: 'user', content: question }
           ]
         })
       })
       const data = await res.json()
-      setAiReply(data.choices?.[0]?.message?.content || 'Sin respuesta.')
+      const rawReply = data.choices?.[0]?.message?.content || 'Sin respuesta.'
+      const actionMatch = rawReply.match(/\|\|\|ACTION\|\|\|([\s\S]*?)\|\|\|END\|\|\|/)
+      let finalReply = rawReply.replace(/\|\|\|ACTION\|\|\|[\s\S]*?\|\|\|END\|\|\|/g, '').trim()
+      if (actionMatch) {
+        try {
+          const actionObj = JSON.parse(actionMatch[1].trim())
+          const actionResult = await executeAction(actionObj)
+          if (actionResult) finalReply = finalReply + (finalReply ? '\n\n' : '') + '✅ ' + actionResult
+        } catch(e) {
+          console.error('Action error:', e)
+        }
+      }
+      setAiReply(finalReply || 'Sin respuesta.')
     } catch(e) {
       console.error('AI error:', e)
       setAiReply('Error conectando con el asistente.')
