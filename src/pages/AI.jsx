@@ -100,10 +100,27 @@ export default function AI() {
         await supabase.from("profiles").update({ monthly_income: Number(action.income) }).eq("id", user.id)
         return "Actualice tu ingreso mensual a RD$"+action.income
       }
+      if (action.type === "delete_fixed_expense") {
+        const { data } = await supabase.from("fixed_expenses").select("*").eq("user_id", user.id)
+        const match = (data||[]).find(e => e.name.toLowerCase().includes((action.name||"").toLowerCase()))
+        if (!match) return "No encontre un gasto fijo llamado: "+action.name
+        await supabase.from("fixed_expenses").delete().eq("id", match.id)
+        return "Elimine el gasto fijo: "+match.name
+      }
+      if (action.type === "delete_transaction") {
+        const { data } = await supabase.from("transactions").select("*").eq("user_id", user.id).order("date", { ascending: false }).limit(50)
+        const match = (data||[]).find(t => 
+          t.description.toLowerCase().includes((action.description||"").toLowerCase()) ||
+          (action.amount && Math.abs(Number(t.amount) - Number(action.amount)) < 10)
+        )
+        if (!match) return "No encontre esa transaccion."
+        await supabase.from("transactions").delete().eq("id", match.id)
+        return "Elimine la transaccion: "+match.description+" RD$"+match.amount
+      }
     } catch(e) {
       return "Error ejecutando la accion: "+e.message
     }
-    return "Accion no reconocida."
+    return "Accion no reconocida: "+action.type
   }
 
   const sendMessage = async (text) => {
