@@ -22,12 +22,14 @@ export default function CycleConfig() {
 
   useEffect(() => {
     async function loadConfig() {
-      if (!user) return
       try {
+        const { data: authData } = await supabase.auth.getUser()
+        const uid = authData?.user?.id
+        if (!uid) return
         const { data, error } = await supabase
           .from('financial_cycles_config')
           .select('*')
-          .eq('user_id', user?.id)
+          .eq('user_id', uid)
           .maybeSingle()
 
         if (data) {
@@ -44,14 +46,8 @@ export default function CycleConfig() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    let userId = user?.id
-    console.log("user object:", user)
-    console.log("user?.id:", user?.id)
-    if (!userId) {
-      const { data } = await supabase.auth.getUser()
-      console.log("getUser result:", data)
-      userId = data?.user?.id
-    }
+    const { data: authData } = await supabase.auth.getUser()
+    const userId = authData?.user?.id
     if (!userId) {
       setMsg({ type: 'error', text: 'Sesion no encontrada. Recarga la pagina.' })
       return
