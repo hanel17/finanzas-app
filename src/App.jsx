@@ -1,20 +1,27 @@
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 
-// Páginas del proyecto
+// Importaciones con nombres exactos de src/pages
 import Dashboard from './pages/Dashboard'
 import CycleConfig from './pages/CycleConfig'
 import Transactions from './pages/Transactions'
 import Cards from './pages/Cards'
 import Goals from './pages/Goals'
 import Insights from './pages/Insights'
-import Copilot from './pages/Copilot'
+import AI from './pages/AI'
+import Login from './pages/Login'
+import Register from './pages/Register'
 
 import { LayoutDashboard, ArrowLeftRight, CreditCard, Target, Lightbulb, Bot, Sliders, Wallet } from 'lucide-react'
 
 function MainLayout({ children }) {
   const location = useLocation()
   const { user } = useAuth()
+
+  // Ocultar Sidebar en pantallas de Login/Register
+  if (location.pathname === '/login' || location.pathname === '/register') {
+    return children
+  }
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
@@ -79,7 +86,7 @@ function MainLayout({ children }) {
         </nav>
       </aside>
 
-      {/* Área Principal */}
+      {/* Contenido Principal */}
       <main style={{ flex: 1, overflowY: 'auto' }}>
         {children}
       </main>
@@ -98,8 +105,10 @@ export default function App() {
           <Route path="/tarjetas" element={<Cards />} />
           <Route path="/metas" element={<Goals />} />
           <Route path="/insights" element={<Insights />} />
-          <Route path="/ia" element={<Copilot />} />
+          <Route path="/ia" element={<AI />} />
           <Route path="/cycle-config" element={<CycleConfig />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </MainLayout>
