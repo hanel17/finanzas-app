@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Edit2, Check, X } from 'lucide-react'
 
 const CATEGORIES = ['hogar','comida','transporte','servicios','salud','educacion','entretenimiento','tarjeta','diezmo','ahorro','otros']
 
@@ -10,6 +10,8 @@ export default function Transactions() {
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [editForm, setEditForm] = useState({})
   const [form, setForm] = useState({ type: 'expense', amount: '', description: '', category: 'otros', date: new Date().toISOString().split('T')[0] })
 
   const load = async () => {
@@ -30,6 +32,17 @@ export default function Transactions() {
 
   const handleDelete = async (id) => {
     await supabase.from('transactions').delete().eq('id', id)
+    load()
+  }
+
+  const handleEdit = (t) => {
+    setEditingId(t.id)
+    setEditForm({ type: t.type, amount: t.amount, description: t.description, category: t.category, date: t.date })
+  }
+
+  const handleUpdate = async () => {
+    await supabase.from('transactions').update(editForm).eq('id', editingId)
+    setEditingId(null)
     load()
   }
 

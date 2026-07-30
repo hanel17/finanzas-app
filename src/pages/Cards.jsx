@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import { Plus, Trash2, CreditCard } from 'lucide-react'
+import { Plus, Trash2, CreditCard, Edit2 } from 'lucide-react'
 
 export default function Cards() {
   const { user } = useAuth()
   const [cards, setCards] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ bank_name: '', card_name: '', credit_limit: '', current_balance: '', minimum_payment: '', due_date: '', interest_rate: '' })
+
+  const [editingCard, setEditingCard] = useState(null)
+  const [editCardForm, setEditCardForm] = useState({})
 
   const load = async () => {
     const { data } = await supabase.from('credit_cards').select('*').eq('user_id', user.id)
@@ -21,6 +24,17 @@ export default function Cards() {
     await supabase.from('credit_cards').insert({ ...form, user_id: user.id })
     setForm({ bank_name: '', card_name: '', credit_limit: '', current_balance: '', minimum_payment: '', due_date: '', interest_rate: '' })
     setShowForm(false)
+    load()
+  }
+
+  const handleEditCard = (c) => {
+    setEditingCard(c.id)
+    setEditCardForm({ bank_name: c.bank_name, card_name: c.card_name, credit_limit: c.credit_limit, current_balance: c.current_balance, minimum_payment: c.minimum_payment, due_date: c.due_date, interest_rate: c.interest_rate })
+  }
+
+  const handleUpdateCard = async () => {
+    await supabase.from('credit_cards').update(editCardForm).eq('id', editingCard)
+    setEditingCard(null)
     load()
   }
 
@@ -91,6 +105,7 @@ export default function Cards() {
                   <div style={{ fontSize: 16, fontWeight: 600 }}>{c.bank_name}</div>
                   <div style={{ fontSize: 13, color: 'var(--gray)' }}>{c.card_name}</div>
                 </div>
+                <button onClick={() => handleEditCard(c)} style={{ background: 'transparent', color: 'var(--gray)', padding: 4 }}><Edit2 size={15}/></button>
                 <button onClick={() => handleDelete(c.id)} style={{ background: 'transparent', color: 'var(--gray)', padding: 4 }}><Trash2 size={16} /></button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>

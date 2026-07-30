@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import { Plus, Trash2, Target } from 'lucide-react'
+import { Plus, Trash2, Target, Edit2 } from 'lucide-react'
 
 export default function Goals() {
   const { user } = useAuth()
   const [goals, setGoals] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [addingTo, setAddingTo] = useState(null)
+  const [editingGoal, setEditingGoal] = useState(null)
+  const [editGoalForm, setEditGoalForm] = useState({})
   const [addAmount, setAddAmount] = useState('')
   const [form, setForm] = useState({ name: '', target_amount: '', current_amount: '0', target_date: '' })
 
@@ -31,6 +33,17 @@ export default function Goals() {
     await supabase.from('savings_goals').update({ current_amount: newAmount }).eq('id', goal.id)
     setAddingTo(null)
     setAddAmount('')
+    load()
+  }
+
+  const handleEditGoal = (g) => {
+    setEditingGoal(g.id)
+    setEditGoalForm({ name: g.name, target_amount: g.target_amount, current_amount: g.current_amount, target_date: g.target_date })
+  }
+
+  const handleUpdateGoal = async () => {
+    await supabase.from('savings_goals').update(editGoalForm).eq('id', editingGoal)
+    setEditingGoal(null)
     load()
   }
 
@@ -85,6 +98,7 @@ export default function Goals() {
                   <div style={{ fontSize: 16, fontWeight: 600 }}>{g.name}</div>
                   <div style={{ fontSize: 12, color: 'var(--gray)', marginTop: 2 }}>Meta: {g.target_date}</div>
                 </div>
+                <button onClick={() => handleEditGoal(g)} style={{ background: 'transparent', color: 'var(--gray)', padding: 4 }}><Edit2 size={15}/></button>
                 <button onClick={() => handleDelete(g.id)} style={{ background: 'transparent', color: 'var(--gray)', padding: 4 }}><Trash2 size={16} /></button>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8 }}>
