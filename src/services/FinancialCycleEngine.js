@@ -4,19 +4,16 @@
  */
 
 export const CycleFrequency = {
-  MONTHLY: 'monthly',          // del X al Y (ej: 25 al 24)
-  BIWEEKLY: 'biweekly',        // Quincenal (ej: 15 y 30)
-  WEEKLY: 'weekly',            // Semanal
-  EVERY_14_DAYS: 'every_14',   // Cada 14 días
-  EVERY_15_DAYS: 'every_15',   // Cada 15 días
-  CUSTOM: 'custom'
+  MONTHLY: "monthly",
+  BIWEEKLY: "biweekly",
+  WEEKLY: "weekly",
+  EVERY_14_DAYS: "every_14",
+  EVERY_15_DAYS: "every_15",
+  CUSTOM: "custom"
 }
 
 export class FinancialCycleEngine {
-  
-  /**
-   * Obtiene o genera las fechas inicio/fin del ciclo actual basado en la configuración.
-   */
+
   static getCurrentCycle(config, referenceDate = new Date()) {
     const ref = new Date(referenceDate)
     const year = ref.getFullYear()
@@ -41,7 +38,6 @@ export class FinancialCycleEngine {
       const payDay2 = Number(config?.pay_day_2) || 15
       const first = Math.min(payDay, payDay2)
       const second = Math.max(payDay, payDay2)
-
       if (day >= second) {
         startDate = new Date(year, month, second)
         endDate = new Date(year, month + 1, first - 1, 23, 59, 59)
@@ -53,12 +49,11 @@ export class FinancialCycleEngine {
         endDate = new Date(year, month, first - 1, 23, 59, 59)
       }
     } else if (frequency === CycleFrequency.WEEKLY) {
-      const dayOfWeek = ref.getDay() // 0 = Domingo
+      const dayOfWeek = ref.getDay()
       startDate.setDate(ref.getDate() - dayOfWeek)
       endDate.setDate(startDate.getDate() + 6)
       endDate.setHours(23, 59, 59)
     } else {
-      // Fallback a mensual 25 al 24
       if (day >= payDay) {
         startDate = new Date(year, month, payDay)
         endDate = new Date(year, month + 1, payDay - 1, 23, 59, 59)
@@ -68,57 +63,79 @@ export class FinancialCycleEngine {
       }
     }
 
-    // Métricas de tiempo del ciclo
     const totalDurationMs = endDate.getTime() - startDate.getTime()
     const totalDays = Math.ceil(totalDurationMs / (1000 * 60 * 60 * 24))
-    
     const elapsedMs = ref.getTime() - startDate.getTime()
     const daysElapsed = Math.max(1, Math.floor(elapsedMs / (1000 * 60 * 60 * 24)))
     const daysRemaining = Math.max(0, totalDays - daysElapsed)
-    
     const progressPercentage = Math.min(100, Math.round((daysElapsed / totalDays) * 100))
 
     return {
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0],
+      startDate: startDate.toISOString().split("T")[0],
+      endDate: endDate.toISOString().split("T")[0],
       totalDays,
       daysElapsed,
       daysRemaining,
       progressPercentage,
-      formattedRange: `${startDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} → ${endDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`
+      formattedRange: `${startDate.toLocaleDateString("es-ES", { day: "numeric", month: "short" })} → ${endDate.toLocaleDateString("es-ES", { day: "numeric", month: "short" })}`
     }
   }
 
   /**
-   * Calcula el dinero libre y el limite diario recomendado considerando Dinero Comprometido
+   * Detecta si un gasto fijo ya fue pagado en este ciclo comparando con transacciones.
+   * Busca transacciones con descripcion similar y monto similar dentro del ciclo.
    */
+  static isFixedExpensePaid(fixedExpense, cycleTxs) {
+    const nameLower = fixedExpense.name.toLowerCase().replace(/[^a-z0-9]/g, "")
+    const amount = Number(fixedExpense.amount)
+
+    return cycleTxs.some(t => {
+      if (t.type !== "expense") return false
+      const descLower = (t.description || "").toLowerCase().replace(/[^a-z0-9]/g, "")
+      const txAmount = Number(t.amount)
+
+      // Match por nombre similar (al menos 4 chars en comun) y monto dentro del 20%
+      const nameMatch = nameLower.length >= 3 && (
+        descLower.includes(nameLower.slice(0, Math.min(6, nameLower.length))) ||
+        nameLower.includes(descLower.slice(0, Math.min(6, descLower.length)))
+      )
+      const amountMatch = Math.abs(txAmount - amount) / Math.max(amount, 1) < 0.20
+
+      return nameMatch || (amountMatch && Math.abs(txAmount - amount) < 200)
+    })
+  }
+
   static calculateCycleMetrics({ transactions = [], fixedExpenses = [], incomeConfig = 0, currentCycle }) {
     const start = currentCycle.startDate
     const end = currentCycle.endDate
 
-    // Transacciones filtradas estrictamente dentro del ciclo actual
     const cycleTxs = transactions.filter(t => t.date >= start && t.date <= end)
 
-    const cycleIncomeTx = cycleTxs.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount || 0), 0)
+    const cycleIncomeTx = cycleTxs.filter(t => t.type === "income").reduce((sum, t) => sum + Number(t.amount || 0), 0)
     const totalIncome = cycleIncomeTx > 0 ? cycleIncomeTx : Number(incomeConfig || 0)
 
-    const cycleSpent = cycleTxs.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount || 0), 0)
+    const cycleSpent = cycleTxs.filter(t => t.type === "expense").reduce((sum, t) => sum + Number(t.amount || 0), 0)
 
-    // Gastos Fijos Comprometidos
-    const committedMoney = fixedExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0)
+    // Solo contar como comprometido lo que NO ha sido pagado aun en este ciclo
+    const unpaidFixed = fixedExpenses.filter(e => !this.isFixedExpensePaid(e, cycleTxs))
+    const paidFixed = fixedExpenses.filter(e => this.isFixedExpensePaid(e, cycleTxs))
 
-    // Dinero Realmente Disponible para Gastar
+    const committedMoney = unpaidFixed.reduce((sum, e) => sum + Number(e.amount || 0), 0)
+    const paidCommitted = paidFixed.reduce((sum, e) => sum + Number(e.amount || 0), 0)
+
     const reallyAvailable = Math.max(0, totalIncome - committedMoney - cycleSpent)
 
-    // Dinero Diario Recomendado
-    const dailyRecommended = currentCycle.daysRemaining > 0 
-      ? Math.round(reallyAvailable / currentCycle.daysRemaining) 
+    const dailyRecommended = currentCycle.daysRemaining > 0
+      ? Math.round(reallyAvailable / currentCycle.daysRemaining)
       : reallyAvailable
 
     return {
       totalIncome,
       cycleSpent,
       committedMoney,
+      paidCommitted,
+      unpaidFixed,
+      paidFixed,
       reallyAvailable,
       dailyRecommended,
       cycleTxs
