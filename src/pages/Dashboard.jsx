@@ -11,6 +11,18 @@ import ScanStatement from '../components/ScanStatement'
 const COLORS = ['#00d084','#4cc9f0','#ffd60a','#ff4d6d','#7b2fff','#f77f00','#06d6a0','#e63946']
 const CAT_ICONS = { comida:'🍔', transporte:'🚗', hogar:'🏠', servicios:'⚡', salud:'💊', entretenimiento:'🎬', tarjeta:'💳', diezmo:'🙏', ahorro:'🏦', ropa:'👕', gas:'⛽', otros:'📦' }
 
+
+const StatCard = ({ icon, label, value, color, sub }) => (
+  <div className="card fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ fontSize: 18 }}>{icon}</span>
+      <span style={{ fontSize: 13, color: '#94a3b8' }}>{label}</span>
+    </div>
+    <div style={{ fontSize: 22, fontWeight: 700, color: color || '#fff' }}>{value}</div>
+    {sub && <div style={{ fontSize: 11, color: '#64748b' }}>{sub}</div>}
+  </div>
+)
+
 export default function Dashboard() {
   const { user } = useAuth()
   const [data, setData] = useState({ profile: null, cards: [], expenses: [], transactions: [], goals: [] })
