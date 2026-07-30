@@ -44,8 +44,11 @@ export default function CycleConfig() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    const { data: { session } } = await supabase.auth.getSession()
-    const userId = user?.id || session?.user?.id
+    let userId = user?.id
+    if (!userId) {
+      const { data } = await supabase.auth.getUser()
+      userId = data?.user?.id
+    }
     if (!userId) {
       setMsg({ type: 'error', text: 'Sesion no encontrada. Recarga la pagina.' })
       return
