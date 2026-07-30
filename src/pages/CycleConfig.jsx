@@ -27,7 +27,7 @@ export default function CycleConfig() {
         const { data, error } = await supabase
           .from('financial_cycles_config')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', user?.id)
           .maybeSingle()
 
         if (data) {
@@ -49,7 +49,7 @@ export default function CycleConfig() {
 
     try {
       const payload = {
-        user_id: user.id,
+        user_id: userId,
         ...form,
         updated_at: new Date().toISOString()
       }
