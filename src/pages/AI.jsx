@@ -130,6 +130,8 @@ export default function AI() {
       })
       const data = await res.json()
       const rawReply = data.choices?.[0]?.message?.content || "Sin respuesta."
+      console.log("RAW REPLY:", rawReply)
+      console.log("HAS ACTION:", rawReply.includes("|||ACTION|||"))
       const actionMatch = rawReply.match(/\|\|\|ACTION\|\|\|([\s\S]*?)\|\|\|END\|\|\|/)
       let finalReply = rawReply.replace(/\|\|\|ACTION\|\|\|[\s\S]*?\|\|\|END\|\|\|/g, "").trim()
       let actionResult = null
