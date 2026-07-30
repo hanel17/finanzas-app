@@ -1,10 +1,12 @@
 import React, { useState } from 'react'
-import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 
 // Páginas
 import Dashboard from './pages/Dashboard'
 import CycleConfig from './pages/CycleConfig'
+import Savings from './pages/Savings'
+import FixedExpenses from './pages/FixedExpenses'
 import Transactions from './pages/Transactions'
 import Cards from './pages/Cards'
 import Goals from './pages/Goals'
@@ -13,11 +15,12 @@ import AI from './pages/AI'
 import Login from './pages/Login'
 import Register from './pages/Register'
 
-import { LayoutDashboard, ArrowLeftRight, CreditCard, Target, Lightbulb, Bot, Sliders, Wallet, Menu, X } from 'lucide-react'
+import { LayoutDashboard, ArrowLeftRight, CreditCard, Target, Lightbulb, Bot, Sliders, Wallet, Menu, X, LogOut, PiggyBank } from 'lucide-react'
 
 function MainLayout({ children }) {
   const location = useLocation()
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
+  const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   if (location.pathname === '/login' || location.pathname === '/register') {
@@ -114,13 +117,25 @@ function MainLayout({ children }) {
             )
           })}
         </nav>
+
+        {/* LOGOUT */}
+        <div style={{ borderTop: '1px solid #1e293b', paddingTop: 12, marginTop: 'auto' }}>
+          <button
+            onClick={async () => { await signOut(); navigate('/login') }}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'transparent', border: 'none', borderRadius: 10, color: '#64748b', fontSize: 14, cursor: 'pointer', transition: 'all .2s' }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#1e293b'; e.currentTarget.style.color = '#f43f5e' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#64748b' }}
+          >
+            <LogOut size={18} />
+            <span>Cerrar sesión</span>
+          </button>
+        </div>
       </aside>
 
       {/* Contenido Principal */}
       <main className="main-content">
         {children}
       </main>
-
     </div>
   )
 }
@@ -137,6 +152,7 @@ export default function App() {
           <Route path="/insights" element={<Insights />} />
           <Route path="/ia" element={<AI />} />
           <Route path="/cycle-config" element={<CycleConfig />} />
+          <Route path="/ahorros" element={<Savings />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="*" element={<Navigate to="/" replace />} />
