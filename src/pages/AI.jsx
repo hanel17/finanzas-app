@@ -48,6 +48,66 @@ export default function AI() {
       " | Metas: " + JSON.stringify(goals.data||[])
   }
 
+  // Execute AI actions on user data
+  const executeAction = async (action) => {
+    try {
+      if (action.type === 'update_fixed_expense') {
+        const { data } = await supabase.from('fixed_expenses').select('*').eq('user_id', user.id)
+        const match = (data||[]).find(e => e.name.toLowerCase().includes(action.name.toLowerCase()))
+        if (match) {
+          await supabase.from('fixed_expenses').update({ 
+            amount: action.amount || match.amount,
+            due_day: action.due_day || match.due_day,
+            name: action.new_name || match.name,
+            category: action.category || match.category
+          }).eq('id', match.id)
+          return `✅ Actualicé "${match.name}" correctamente.`
+        }
+        return `❌ No encontré un gasto fijo llamado "${action.name}".`
+      }
+      if (action.type === 'update_card_balance') {
+        const { data } = await supabase.from('credit_cards').select('*').eq('user_id', user.id)
+        const match = (data||[]).find(c => c.bank_name.toLowerCase().includes(action.bank.toLowerCase()) || c.card_name.toLowerCase().includes(action.bank.toLowerCase()))
+        if (match) {
+          await supabase.from('credit_cards').update({ current_balance: action.balance }).eq('id', match.id)
+          return `✅ Actualicé el balance de ${match.bank_name} ${match.card_name} a RD$${action.balance}.`
+        }
+        return `❌ No encontré esa tarjeta.`
+      }
+      if (action.type === 'update_goal') {
+        const { data } = await supabase.from('savings_goals').select('*').eq('user_id', user.id)
+        const match = (data||[]).find(g => g.name.toLowerCase().includes(action.name.toLowerCase()))
+        if (match) {
+          const updates = {}
+          if (action.current_amount !== undefined) updates.current_amount = action.current_amount
+          if (action.target_amount !== undefined) updates.target_amount = action.target_amount
+          if (action.target_date) updates.target_date = action.target_date
+          await supabase.from('savings_goals').update(updates).eq('id', match.id)
+          return `✅ Actualicé la meta "${match.name}".`
+        }
+        return `❌ No encontré esa meta.`
+      }
+      if (action.type === 'add_transaction') {
+        await supabase.from('transactions').insert({
+          user_id: user.id,
+          type: action.tx_type || 'expense',
+          amount: action.amount,
+          description: action.description,
+          category: action.category || 'otros',
+          date: action.date || new Date().toISOString().split('T')[0]
+        })
+        return `✅ Registré la transacción: ${action.description} por RD$${action.amount}.`
+      }
+      if (action.type === 'update_profile_income') {
+        await supabase.from('profiles').update({ monthly_income: action.income }).eq('id', user.id)
+        return `✅ Actualicé tu ingreso mensual a RD$${action.income}.`
+      }
+    } catch(e) {
+      return `❌ Error ejecutando la acción: ${e.message}`
+    }
+    return null
+  }
+
   const sendMessage = async (text) => {
     const q = text || input
     if (!q.trim() || loading) return
