@@ -258,7 +258,7 @@ ${recentTx || 'Sin transacciones'}
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             onClick={() => navigate('/cycle-config')}
             style={{ padding: '10px 14px', background: '#1e293b', border: '1px solid #334155', color: '#cbd5e1', borderRadius: 10, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}

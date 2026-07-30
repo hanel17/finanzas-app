@@ -135,7 +135,7 @@ export default function QuickAdd({ onClose, onSaved }) {
                 style={{ flex: 1 }} />
             </div>
             {showEmojiPicker && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, background: 'var(--bg3)', borderRadius: 10, padding: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6, marginTop: 10, background: 'var(--bg3)', borderRadius: 10, padding: 10 }}>
                 <button onClick={() => { setEmoji(''); setShowEmojiPicker(false) }}
                   style={{ padding: '4px 8px', borderRadius: 6, background: 'var(--bg4)', border: '1px solid var(--border2)', color: 'var(--text2)', fontSize: 11, cursor: 'pointer' }}>
                   Auto
@@ -151,7 +151,7 @@ export default function QuickAdd({ onClose, onSaved }) {
           </div>
 
           {/* Categories */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 16 }}>
             {CATEGORIES.map(c => (
               <button key={c.id} onClick={() => setCategory(c.id)}
                 style={{ padding: '6px 10px', borderRadius: 20, background: category === c.id ? 'rgba(0,208,132,0.15)' : 'var(--bg3)', border: `1px solid ${category === c.id ? 'var(--green)' : 'var(--border2)'}`, color: category === c.id ? 'var(--green)' : 'var(--text2)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>

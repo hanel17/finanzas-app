@@ -53,7 +53,7 @@ function MainLayout({ children }) {
       />
 
       {/* Sidebar / Menú Lateral */}
-      <aside className={`sidebar-drawer ${mobileMenuOpen ? 'open' : ''}`}>
+      <aside className={`sidebar-drawer ${mobileMenuOpen ? "open" : ""}`} style={{ background: "#090d16", padding: 20, display: "flex", flexDirection: "column", gap: 24 }}>
         
         {/* Cabecera del Menú */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
@@ -87,6 +87,7 @@ function MainLayout({ children }) {
                 onClick={() => setMobileMenuOpen(false)}
                 style={{
                   display: 'flex',
+                  flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '12px 14px',
