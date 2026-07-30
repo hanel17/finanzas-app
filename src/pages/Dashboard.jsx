@@ -336,7 +336,7 @@ ${recentTx || 'Sin transacciones'}
             <span style={{ fontSize: 12, color: '#94a3b8' }}>¿Cuánto dinero tengo hoy?</span>
           </div>
           <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#10b981', letterSpacing: '-0.5px' }}>
-            {currSymbol}{(metrics?.moneyInHand || 0).toLocaleString()}
+            {currSymbol}{(metrics?.moneyInHand || 0).toLocaleString('es-DO', {minimumFractionDigits: 0, maximumFractionDigits: 2})}
           </h2>
           <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
             Ingresos + saldo anterior
@@ -349,11 +349,38 @@ ${recentTx || 'Sin transacciones'}
             <span style={{ fontSize: 12, color: '#94a3b8' }}>¿Cuánto debo pagar?</span>
           </div>
           <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#f59e0b', letterSpacing: '-0.5px' }}>
-            {currSymbol}{(metrics?.totalUnpaid || 0).toLocaleString()}
+            {currSymbol}{(metrics?.totalUnpaid || 0).toLocaleString('es-DO', {minimumFractionDigits: 0, maximumFractionDigits: 2})}
           </h2>
-          <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
+          <div style={{ fontSize: 11, color: '#475569', marginTop: 4, marginBottom: 8 }}>
             {metrics?.unpaidCommitments?.length || 0} compromisos pendientes
           </div>
+          {metrics?.unpaidCommitments?.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+              {metrics.unpaidCommitments.map((c, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1e293b', borderRadius: 8, padding: '8px 10px' }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 500 }}>{c.name}</div>
+                    <div style={{ fontSize: 10, color: '#64748b' }}>RD${Number(c.amount).toLocaleString('es-DO', {maximumFractionDigits: 0})}</div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      await supabase.from('transactions').insert({
+                        user_id: user.id,
+                        type: 'expense',
+                        amount: Number(c.amount),
+                        description: c.name,
+                        category: c.category || 'otros',
+                        date: new Date().toISOString().split('T')[0]
+                      })
+                      loadData()
+                    }}
+                    style={{ background: '#10b981', color: '#000', fontSize: 11, fontWeight: 600, padding: '5px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    ✓ Pagué
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: 18, borderRadius: 16 }}>
@@ -362,7 +389,7 @@ ${recentTx || 'Sin transacciones'}
             <span style={{ fontSize: 12, color: '#94a3b8' }}>¿Cuánto ya gasté?</span>
           </div>
           <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#f43f5e', letterSpacing: '-0.5px' }}>
-            {currSymbol}{(metrics?.cycleSpent || 0).toLocaleString()}
+            {currSymbol}{(metrics?.cycleSpent || 0).toLocaleString('es-DO', {minimumFractionDigits: 0, maximumFractionDigits: 2})}
           </h2>
           <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
             Gastos realizados este ciclo
@@ -375,10 +402,10 @@ ${recentTx || 'Sin transacciones'}
             <span style={{ fontSize: 12, color: '#94a3b8' }}>¿Cuánto puedo gastar?</span>
           </div>
           <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#38bdf8', letterSpacing: '-0.5px' }}>
-            {currSymbol}{(metrics?.moneyAvailable || 0).toLocaleString()}
+            {currSymbol}{(metrics?.moneyAvailable || 0).toLocaleString('es-DO', {minimumFractionDigits: 0, maximumFractionDigits: 2})}
           </h2>
           <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
-            {currSymbol}{(metrics?.dailyBudget || 0).toLocaleString()}/día por {currentCycle?.daysRemaining} días
+            {currSymbol}{(metrics?.dailyBudget || 0).toLocaleString('es-DO', {minimumFractionDigits: 0, maximumFractionDigits: 2})}/día por {currentCycle?.daysRemaining} días
           </div>
         </div>
       </div>
