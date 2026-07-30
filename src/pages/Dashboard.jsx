@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import ScanStatement from '../components/ScanStatement'
 import QuickAdd from '../components/QuickAdd'
-import { FinancialCycleEngine } from '../services/FinancialCycleEngine'
+import { FinancialEngine } from '../services/FinancialEngine'
 import { Plus, Sparkles, Calendar, DollarSign, ShieldAlert, Zap, Send, Settings } from 'lucide-react'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts'
 import { useNavigate } from 'react-router-dom'
@@ -181,10 +181,10 @@ Período: ${currentCycle?.formattedRange}
 Días transcurridos: ${currentCycle?.daysElapsed}
 Días restantes: ${currentCycle?.daysRemaining}
 Ingreso del ciclo: RD$${metrics?.totalIncome}
-Gastos comprometidos (fijos): RD$${metrics?.committedMoney}
+Gastos comprometidos (fijos): RD$${metrics?.totalUnpaid}
 Gastos realizados: RD$${metrics?.cycleSpent}
-Dinero realmente libre: RD$${metrics?.reallyAvailable}
-Gasto diario recomendado: RD$${metrics?.dailyRecommended}
+Dinero realmente libre: RD$${metrics?.moneyAvailable}
+Gasto diario recomendado: RD$${metrics?.dailyBudget}
 
 === TARJETAS DE CRÉDITO ===
 ${cards.map(c => `${c.bank_name} ${c.card_name}: Balance RD$${c.current_balance} de RD$${c.credit_limit} (${((c.current_balance/c.credit_limit)*100).toFixed(0)}%) | Vence: ${c.due_date} | Mínimo: RD$${c.minimum_payment} | Tasa: ${c.interest_rate}%`).join('\n') || 'Sin tarjetas'}
@@ -236,13 +236,16 @@ ${recentTx || 'Sin transacciones'}
   }
 
   // CÁLCULO DEL MOTOR DE CICLO FINANCIERO
-  const currentCycle = FinancialCycleEngine.getCurrentCycle(data.cycleConfig)
-  const metrics = FinancialCycleEngine.calculateCycleMetrics({
+  const currentCycle = FinancialEngine.getCurrentCycle(data.cycleConfig)
+  const metrics = FinancialEngine.calculate({
     transactions: data.transactions,
     fixedExpenses: data.expenses,
+    savings: data.savings || [],
+    carryOver: data.carryOver || 0,
     incomeConfig: data.cycleConfig?.expected_income || 45000,
-    currentCycle
+    cycle: currentCycle
   })
+  const health = FinancialEngine.getHealthLabel(metrics?.cycleHealth)
 
   const currSymbol = data.cycleConfig?.currency === 'USD' ? '$' : 'RD$'
 
@@ -300,55 +303,95 @@ ${recentTx || 'Sin transacciones'}
           <div>
             <span style={{ fontSize: 12, color: '#94a3b8' }}>Gasto Diario Recomendado Hasta el Próximo Cobro:</span>
             <h3 style={{ margin: '2px 0 0 0', fontSize: 20, fontWeight: 800, color: '#10b981' }}>
-              {currSymbol}{metrics.dailyRecommended.toLocaleString()}/día
+              {currSymbol}{metrics.dailyBudget.toLocaleString()}/día
             </h3>
           </div>
           <p style={{ margin: 0, fontSize: 12, color: '#cbd5e1', maxWidth: 400 }}>
-            Te quedan <b>{currSymbol}{metrics.reallyAvailable.toLocaleString()}</b> libres para consumir en los próximos <b>{currentCycle.daysRemaining} días</b>.
+            Te quedan <b>{currSymbol}{metrics.moneyAvailable.toLocaleString()}</b> libres para consumir en los próximos <b>{currentCycle.daysRemaining} días</b>.
           </p>
         </div>
       </div>
 
       {/* DETALLE DE DINERO COMPROMETIDO VS LIBRE */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+      {/* SALUD DEL CICLO */}
+      <div style={{ background: `${health?.color}15`, border: `1px solid ${health?.color}40`, borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span style={{ fontSize: 24 }}>{health?.emoji}</span>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: health?.color }}>{health?.label}</div>
+          <div style={{ fontSize: 12, color: '#94a3b8' }}>{health?.desc}</div>
+        </div>
+        {metrics?.carryOver > 0 && (
+          <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+            <div style={{ fontSize: 11, color: '#64748b' }}>Saldo arrastrado</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#10b981' }}>+{currSymbol}{metrics.carryOver.toLocaleString()}</div>
+          </div>
+        )}
+      </div>
+
+      {/* 4 PREGUNTAS CLAVE */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
         <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: 18, borderRadius: 16 }}>
-          <span style={{ fontSize: 12, color: '#94a3b8' }}>Ingreso del Ciclo</span>
-          <h2 style={{ fontSize: 22, fontWeight: 700, margin: '6px 0 0 0', color: '#10b981' }}>
-            {currSymbol}{metrics.totalIncome.toLocaleString()}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 18 }}>💵</span>
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>¿Cuánto dinero tengo hoy?</span>
+          </div>
+          <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#10b981', letterSpacing: '-0.5px' }}>
+            {currSymbol}{(metrics?.moneyInHand || 0).toLocaleString()}
           </h2>
+          <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
+            Ingresos + saldo anterior
+          </div>
         </div>
 
         <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: 18, borderRadius: 16 }}>
-          <span style={{ fontSize: 12, color: '#94a3b8' }}>Dinero Comprometido (Fijos)</span>
-          <h2 style={{ fontSize: 22, fontWeight: 700, margin: '6px 0 0 0', color: '#f59e0b' }}>
-            {currSymbol}{metrics.committedMoney.toLocaleString()}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 18 }}>📋</span>
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>¿Cuánto debo pagar?</span>
+          </div>
+          <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#f59e0b', letterSpacing: '-0.5px' }}>
+            {currSymbol}{(metrics?.totalUnpaid || 0).toLocaleString()}
           </h2>
+          <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
+            {metrics?.unpaidCommitments?.length || 0} compromisos pendientes
+          </div>
         </div>
 
         <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: 18, borderRadius: 16 }}>
-          <span style={{ fontSize: 12, color: '#94a3b8' }}>Gastos Realizados</span>
-          <h2 style={{ fontSize: 22, fontWeight: 700, margin: '6px 0 0 0', color: '#f43f5e' }}>
-            {currSymbol}{metrics.cycleSpent.toLocaleString()}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 18 }}>💸</span>
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>¿Cuánto ya gasté?</span>
+          </div>
+          <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#f43f5e', letterSpacing: '-0.5px' }}>
+            {currSymbol}{(metrics?.cycleSpent || 0).toLocaleString()}
           </h2>
+          <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
+            Gastos realizados este ciclo
+          </div>
         </div>
 
-        <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: 18, borderRadius: 16 }}>
-          <span style={{ fontSize: 12, color: '#94a3b8' }}>Dinero Realmente Libre</span>
-          <h2 style={{ fontSize: 22, fontWeight: 700, margin: '6px 0 0 0', color: '#38bdf8' }}>
-            {currSymbol}{metrics.reallyAvailable.toLocaleString()}
+        <div style={{ background: '#0f172a', border: '2px solid #10b98140', padding: 18, borderRadius: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 18 }}>✅</span>
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>¿Cuánto puedo gastar?</span>
+          </div>
+          <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#38bdf8', letterSpacing: '-0.5px' }}>
+            {currSymbol}{(metrics?.moneyAvailable || 0).toLocaleString()}
           </h2>
+          <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
+            {currSymbol}{(metrics?.dailyBudget || 0).toLocaleString()}/día por {currentCycle?.daysRemaining} días
+          </div>
         </div>
       </div>
 
       {/* UPCOMING PAYMENTS - fuera de este ciclo */}
-      {metrics?.fixedOutOfCycle?.length > 0 && (
+      {metrics?.upcomingCommitments?.length > 0 && (
         <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 16, padding: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <span style={{ fontSize: 16 }}>📅</span>
             <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Próximos pagos (fuera de este ciclo)</h4>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {metrics.fixedOutOfCycle.map((e, i) => (
+            {metrics.upcomingCommitments.map((e, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#020617', borderRadius: 10, border: '1px solid #1e293b' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 32, height: 32, borderRadius: 8, background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>
@@ -367,7 +410,7 @@ ${recentTx || 'Sin transacciones'}
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 12px', fontSize: 12, color: '#64748b' }}>
               <span>Total comprometido próximo ciclo</span>
               <span style={{ color: '#f59e0b', fontWeight: 600 }}>
-                RD${metrics.fixedOutOfCycle.reduce((s,e) => s+Number(e.amount),0).toLocaleString()}
+                RD${metrics.upcomingCommitments.reduce((s,e) => s+Number(e.amount),0).toLocaleString()}
               </span>
             </div>
           </div>
