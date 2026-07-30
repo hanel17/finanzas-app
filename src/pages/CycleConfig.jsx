@@ -25,7 +25,7 @@ export default function CycleConfig() {
       try {
         const { data: authData } = await supabase.auth.getUser()
         const uid = authData?.user?.id
-        if (!uid) return
+        if (!uid) { navigate('/login'); return }
         const { data, error } = await supabase
           .from('financial_cycles_config')
           .select('*')
@@ -49,7 +49,7 @@ export default function CycleConfig() {
     const { data: authData } = await supabase.auth.getUser()
     const userId = authData?.user?.id
     if (!userId) {
-      setMsg({ type: 'error', text: 'Sesion no encontrada. Recarga la pagina.' })
+      navigate('/login')
       return
     }
     setSaving(true)
