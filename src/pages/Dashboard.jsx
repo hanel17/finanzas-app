@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import ScanStatement from '../components/ScanStatement'
+import QuickAdd from '../components/QuickAdd'
 import { FinancialCycleEngine } from '../services/FinancialCycleEngine'
 import { Plus, Sparkles, Calendar, DollarSign, ShieldAlert, Zap, Send, Settings } from 'lucide-react'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts'
@@ -14,7 +15,10 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [showScan, setShowScan] = useState(false)
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
+  const [aiReply, setAiReply] = useState(null)
+  const [aiLoading, setAiLoading] = useState(false)
   
   const [data, setData] = useState({
     cycleConfig: null,
@@ -51,6 +55,33 @@ export default function Dashboard() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  const askAI = async (q) => {
+    const question = q || aiPrompt.trim()
+    if (!question || aiLoading) return
+    setAiPrompt('')
+    setAiLoading(true)
+    setAiReply(null)
+    try {
+      const cycleContext = `Ciclo actual: ${currentCycle?.formattedRange}. Dias restantes: ${currentCycle?.daysRemaining}. Ingreso del ciclo: RD$${metrics?.totalIncome}. Gastos realizados: RD$${metrics?.cycleSpent}. Dinero libre: RD$${metrics?.reallyAvailable}. Gasto diario recomendado: RD$${metrics?.dailyRecommended}.`
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + import.meta.env.VITE_GROQ_API_KEY },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            { role: 'system', content: 'Eres un asesor financiero personal. Responde en maximo 3 oraciones, directo y en espanol dominicano. ' + cycleContext },
+            { role: 'user', content: question }
+          ]
+        })
+      })
+      const data = await res.json()
+      setAiReply(data.choices?.[0]?.message?.content || 'Sin respuesta.')
+    } catch(e) {
+      setAiReply('Error conectando con el asistente.')
+    }
+    setAiLoading(false)
+  }
 
   // CÁLCULO DEL MOTOR DE CICLO FINANCIERO
   const currentCycle = FinancialCycleEngine.getCurrentCycle(data.cycleConfig)
@@ -169,6 +200,14 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {aiReply && (
+          <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 10, padding: '10px 14px', fontSize: 13, lineHeight: 1.6, color: '#e2e8f0' }}>
+            <span style={{ color: '#10b981', fontWeight: 600, marginRight: 6 }}>✦</span>{aiReply}
+          </div>
+        )}
+        {aiLoading && (
+          <div style={{ fontSize: 13, color: '#64748b', padding: '8px 0' }}>Analizando tu ciclo...</div>
+        )}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {[
             '¿Llegaré con dinero al final del ciclo?',
@@ -176,10 +215,23 @@ export default function Dashboard() {
             'Analiza mis gastos comprometidos',
             'Pronóstico para el próximo pago'
           ].map((q, i) => (
-            <button key={i} onClick={() => setAiPrompt(q)} style={{ background: '#0f172a', border: '1px solid #1e293b', color: '#94a3b8', padding: '6px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer' }}>
+            <button key={i} onClick={() => askAI(q)} style={{ background: '#0f172a', border: '1px solid #1e293b', color: '#94a3b8', padding: '6px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer' }}>
               {q}
             </button>
           ))}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            value={aiPrompt}
+            onChange={e => setAiPrompt(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && askAI()}
+            placeholder="Pregunta sobre tu ciclo financiero..."
+            style={{ flex: 1, padding: '9px 14px', fontSize: 13, background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#fff', outline: 'none' }}
+          />
+          <button onClick={() => askAI()} disabled={!aiPrompt.trim() || aiLoading}
+            style={{ background: aiPrompt.trim() ? '#10b981' : '#1e293b', color: '#000', width: 38, height: 38, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0, border: 'none', cursor: 'pointer' }}>
+            <Send size={15} color={aiPrompt.trim() ? '#000' : '#555'} />
+          </button>
         </div>
       </div>
 
@@ -187,6 +239,12 @@ export default function Dashboard() {
       {showScan && (
         <ScanStatement onClose={() => setShowScan(false)} onSaved={() => loadData()} />
       )}
+      {showQuickAdd && (
+        <QuickAdd onClose={() => setShowQuickAdd(false)} onSaved={loadData} />
+      )}
+      <button onClick={() => setShowQuickAdd(true)} style={{ position:'fixed', bottom:24, right:24, width:52, height:52, borderRadius:'50%', background:'#10b981', color:'#000', fontSize:24, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 4px 20px rgba(16,185,129,0.4)', zIndex:200, border:'none', cursor:'pointer' }}>
+        <Plus size={22} />
+      </button>
 
     </div>
   )
