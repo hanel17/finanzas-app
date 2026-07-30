@@ -179,35 +179,33 @@ export default function Dashboard() {
       ).join('\n')
 
       const fullContext = `
-=== PERFIL ===
-Nombre: ${profile.full_name || 'Usuario'}
-Ingreso mensual titular: RD$${profile.monthly_income || 0}
-Ingreso pareja: RD$${profile.spouse_income || 0}
-Ingreso total: RD$${(profile.monthly_income || 0) + (profile.spouse_income || 0)}
+=== CICLO ACTUAL (${currentCycle?.formattedRange}) ===
+Dias transcurridos: ${currentCycle?.daysElapsed} | Dias restantes: ${currentCycle?.daysRemaining}
 
-=== CICLO ACTUAL ===
-Período: ${currentCycle?.formattedRange}
-Días transcurridos: ${currentCycle?.daysElapsed}
-Días restantes: ${currentCycle?.daysRemaining}
-Ingreso del ciclo: RD$${metrics?.totalIncome}
-Gastos comprometidos (fijos): RD$${metrics?.totalUnpaid}
-Gastos realizados: RD$${metrics?.cycleSpent}
-Dinero realmente libre: RD$${metrics?.moneyAvailable}
-Gasto diario recomendado: RD$${metrics?.dailyBudget}
+=== MIS 4 NUMEROS CLAVE ===
+Dinero en mano: RD$${Math.round(metrics?.moneyInHand || 0).toLocaleString()}
+Compromisos pendientes: RD$${Math.round(metrics?.totalUnpaid || 0).toLocaleString()}
+Gastos realizados: RD$${Math.round(metrics?.cycleSpent || 0).toLocaleString()}
+Puedo gastar: RD$${Math.round(metrics?.moneyAvailable || 0).toLocaleString()}
+Presupuesto diario: RD$${Math.round(metrics?.dailyBudget || 0).toLocaleString()}/dia
+Salud del ciclo: ${metrics?.cycleHealth}
 
-=== TARJETAS DE CRÉDITO ===
-${cards.map(c => `${c.bank_name} ${c.card_name}: Balance RD$${c.current_balance} de RD$${c.credit_limit} (${((c.current_balance/c.credit_limit)*100).toFixed(0)}%) | Vence: ${c.due_date} | Mínimo: RD$${c.minimum_payment} | Tasa: ${c.interest_rate}%`).join('\n') || 'Sin tarjetas'}
+=== COMPROMISOS DE ESTE CICLO (pendientes) ===
+${(metrics?.unpaidCommitments || []).map(e => `- ${e.name}: RD$${Math.round(Number(e.amount)).toLocaleString()} (${e.category}) | Dia ${e.due_day || 'sin fecha'}`).join('\n') || 'Ninguno pendiente'}
 
-=== GASTOS FIJOS MENSUALES ===
-${expenses.map(e => `${e.name}: RD$${e.amount} (${e.category})${e.due_day ? ' | Día ' + e.due_day : ''}`).join('\n') || 'Sin gastos fijos'}
+=== COMPROMISOS YA PAGADOS ESTE CICLO ===
+${(metrics?.paidCommitments || []).map(e => `- ${e.name}: RD$${Math.round(Number(e.amount)).toLocaleString()} PAGADO`).join('\n') || 'Ninguno pagado aun'}
 
-=== METAS DE AHORRO ===
-${goals.map(g => `${g.name}: RD$${g.current_amount} de RD$${g.target_amount} (${((g.current_amount/g.target_amount)*100).toFixed(0)}%) | Meta: ${g.target_date}`).join('\n') || 'Sin metas'}
+=== PROXIMOS PAGOS (siguiente ciclo) ===
+${(metrics?.upcomingCommitments || []).map(e => `- ${e.name}: RD$${Math.round(Number(e.amount)).toLocaleString()} | Dia ${e.due_day}`).join('\n') || 'Ninguno'}
 
-=== GASTOS POR CATEGORÍA (histórico) ===
-${Object.entries(byCat).sort((a,b) => b[1]-a[1]).map(([k,v]) => `${k}: RD$${v.toLocaleString()}`).join('\n') || 'Sin datos'}
+=== TARJETAS ===
+${cards.map(c => `- ${c.bank_name} ${c.card_name}: Balance RD$${Math.round(Number(c.current_balance)).toLocaleString()} de RD$${Math.round(Number(c.credit_limit)).toLocaleString()} | Vence ${c.due_date}`).join('\n') || 'Sin tarjetas'}
 
-=== ÚLTIMAS 30 TRANSACCIONES ===
+=== GASTOS POR CATEGORIA (este ciclo) ===
+${Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`- ${k}: RD$${Math.round(v).toLocaleString()}`).join('\n') || 'Sin gastos'}
+
+=== ULTIMAS 20 TRANSACCIONES ===
 ${recentTx || 'Sin transacciones'}
       `
 
