@@ -1,239 +1,216 @@
-import { useEffect, useState, useCallback } from 'react'
-import { useAuth } from '../context/AuthContext'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import { TrendingUp, TrendingDown, Wallet, Target, Plus, ArrowRight } from 'lucide-react'
-import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { Link } from 'react-router-dom'
-import QuickAdd from '../components/QuickAdd'
-import AIBar from '../components/AIBar'
+import { useAuth } from '../context/AuthContext'
 import ScanStatement from '../components/ScanStatement'
+import { Plus, Sparkles, TrendingUp, TrendingDown, DollarSign, CreditCard, PieChart as PieIcon, Send } from 'lucide-react'
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts'
 
 const COLORS = ['#00d084','#4cc9f0','#ffd60a','#ff4d6d','#7b2fff','#f77f00','#06d6a0','#e63946']
-const CAT_ICONS = { comida:'🍔', transporte:'🚗', hogar:'🏠', servicios:'⚡', salud:'💊', entretenimiento:'🎬', tarjeta:'💳', diezmo:'🙏', ahorro:'🏦', ropa:'👕', gas:'⛽', otros:'📦' }
-
 
 const StatCard = ({ icon, label, value, color, sub }) => (
-  <div className="card fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+  <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: 20, borderRadius: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <span style={{ fontSize: 18 }}>{icon}</span>
-      <span style={{ fontSize: 13, color: '#94a3b8' }}>{label}</span>
+      <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>{label}</span>
     </div>
-    <div style={{ fontSize: 22, fontWeight: 700, color: color || '#fff' }}>{value}</div>
+    <div style={{ fontSize: 24, fontWeight: 700, color: color || '#fff' }}>{value}</div>
     {sub && <div style={{ fontSize: 11, color: '#64748b' }}>{sub}</div>}
   </div>
 )
 
 export default function Dashboard() {
   const { user } = useAuth()
-  const [data, setData] = useState({ profile: null, cards: [], expenses: [], transactions: [], goals: [] })
   const [loading, setLoading] = useState(true)
-  const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [showScan, setShowScan] = useState(false)
+  const [data, setData] = useState({ profile: null, cards: [], expenses: [], transactions: [], goals: [] })
+  const [aiPrompt, setAiPrompt] = useState('')
 
   const load = useCallback(async () => {
-    const [p, c, e, t, g] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', user.id).single(),
-      supabase.from('credit_cards').select('*').eq('user_id', user.id),
-      supabase.from('fixed_expenses').select('*').eq('user_id', user.id),
-      supabase.from('transactions').select('*').eq('user_id', user.id).order('date', { ascending: false }),
-      supabase.from('savings_goals').select('*').eq('user_id', user.id),
-    ])
-    setData({ profile: p.data, cards: c.data||[], expenses: e.data||[], transactions: t.data||[], goals: g.data||[] })
-    setLoading(false)
+    if (!user) return
+    setLoading(true)
+    try {
+      const [p, c, e, t, g] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+        supabase.from('credit_cards').select('*').eq('user_id', user.id),
+        supabase.from('fixed_expenses').select('*').eq('user_id', user.id),
+        supabase.from('transactions').select('*').eq('user_id', user.id).order('date', { ascending: false }),
+        supabase.from('savings_goals').select('*').eq('user_id', user.id),
+      ])
+      setData({ 
+        profile: p.data || null, 
+        cards: c.data || [], 
+        expenses: e.data || [], 
+        transactions: t.data || [], 
+        goals: g.data || [] 
+      })
+    } catch (err) {
+      console.error("Error cargando dashboard:", err)
+    } finally {
+      setLoading(false)
+    }
   }, [user])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
-  if (loading) return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 80, borderRadius: 16 }} />)}
-    </div>
-  )
+  const { profile, cards, expenses, transactions, goals } = data
 
-    const { profile, cards, expenses, transactions, goals } = data
-  const totalIncome = (profile?.monthly_income||0) + (profile?.spouse_income||0)
-  const totalFixed = expenses.reduce((s,e) => s+Number(e.amount), 0)
-  const totalDebt = cards.reduce((s,c) => s+Number(c.current_balance), 0)
-  const monthTx = transactions.filter(t => t.date?.startsWith(new Date().toISOString().slice(0,7)))
-  const monthExpenses = monthTx.filter(t => t.type==='expense').reduce((s,t)=>s+Number(t.amount),0)
-  const monthIncome = monthTx.filter(t => t.type==='income').reduce((s,t)=>s+Number(t.amount),0)
+  // Cálculos Dinámicos
+  const totalIncomeProfile = (profile?.monthly_income || 0) + (profile?.spouse_income || 0)
+  const totalFixed = expenses.reduce((s, e) => s + Number(e.amount || 0), 0)
+  const totalDebt = cards.reduce((s, c) => s + Number(c.current_balance || 0), 0)
+
+  const currentMonthStr = new Date().toISOString().slice(0, 7)
+  const monthTx = transactions.filter(t => t.date?.startsWith(currentMonthStr))
   
-  const displayIncome = totalIncome > 0 ? totalIncome : monthIncome
+  const monthExpenses = monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0)
+  const monthIncome = monthTx.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount || 0), 0)
+
+  const displayIncome = totalIncomeProfile > 0 ? totalIncomeProfile : monthIncome
   const displayFixed = totalFixed > 0 ? totalFixed : monthExpenses
   const available = displayIncome - displayFixed
 
+  // Datos para Gráficas
+  const sourceForPie = expenses.length > 0 ? expenses : transactions.filter(t => t.type === 'expense')
+  const pieData = sourceForPie.reduce((acc, e) => {
+    const cat = e.category || 'Otros'
+    const f = acc.find(a => a.name === cat)
+    if (f) f.value += Number(e.amount || 0)
+    else acc.push({ name: cat, value: Number(e.amount || 0) })
+    return acc
+  }, [])
+
+  const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+  const chartData = monthNames.slice(0, new Date().getMonth() + 1).map((m, i) => {
+    const mo = String(i + 1).padStart(2, '0')
+    const txs = transactions.filter(t => t.date?.includes(`-${mo}-`))
+    return {
+      name: m,
+      gastos: txs.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0),
+      ingresos: txs.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount || 0), 0)
+    }
+  })
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', color: '#fff', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.5px' }}>
-            Hola, {profile?.full_name?.split(' ')[0] || 'bienvenido'} 👋
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 4 }}>
-            {new Date().toLocaleDateString('es-DO', { weekday: 'long', day: 'numeric', month: 'long' })}
-          </div>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>Hola, bienvenido 👋</h1>
+          <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: 14 }}>
+            {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setShowScan(true)} style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', fontSize: 13 }}>
+
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button
+            onClick={() => setShowScan(true)}
+            style={{ padding: '10px 16px', background: '#1e293b', border: '1px solid #334155', color: '#f8fafc', borderRadius: 10, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}
+          >
             📄 Escanear
           </button>
-          <button onClick={() => setShowQuickAdd(true)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px' }}>
+          <button
+            style={{ padding: '10px 16px', background: '#10b981', border: 'none', color: '#000', borderRadius: 10, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}
+          >
             <Plus size={16} /> Agregar
           </button>
         </div>
       </div>
 
-      <AIBar userName={profile?.full_name?.split(' ')[0]} />
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-        <StatCard icon={<TrendingUp size={16}/>} label="Ingreso mensual" value={`RD$${displayIncome.toLocaleString()}`} color="var(--green)" sub={`Tú + pareja`} />
-        <StatCard icon={<TrendingDown size={16}/>} label="Gastos fijos" value={`RD$${displayFixed.toLocaleString()}`} color="var(--red)" sub="Este mes" />
-        <StatCard icon={<Wallet size={16}/>} label="Deuda tarjetas" value={`RD$${totalDebt.toLocaleString()}`} color="var(--yellow)" sub={`${cards.length} tarjetas`} />
-        <StatCard icon={<Target size={16}/>} label="Disponible" value={`RD$${available.toLocaleString()}`} color="var(--blue)" sub="Para metas/ahorro" />
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-        <div className="card">
-          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>Flujo del año</div>
-          <ResponsiveContainer width="100%" height={160}>
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00d084" stopOpacity={0.2}/>
-                  <stop offset="95%" stopColor="#00d084" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="r" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ff4d6d" stopOpacity={0.2}/>
-                  <stop offset="95%" stopColor="#ff4d6d" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="name" tick={{ fill: '#555', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, fontSize: 12 }} formatter={v=>`RD$${Number(v).toLocaleString()}`} />
-              <Area type="monotone" dataKey="ingresos" stroke="#00d084" fill="url(#g)" strokeWidth={2} />
-              <Area type="monotone" dataKey="gastos" stroke="#ff4d6d" fill="url(#r)" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
+      {/* Asistente IA */}
+      <div style={{ background: '#090d16', border: '1px solid #1e293b', borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ background: '#312e81', padding: 6, borderRadius: 8 }}>
+            <Sparkles size={18} color="#818cf8" />
+          </div>
+          <div>
+            <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Buenas noches, bienvenido 👋</h4>
+            <span style={{ fontSize: 11, color: '#64748b' }}>Asistente IA • Basado en tus datos reales</span>
+          </div>
         </div>
 
-        <div className="card">
-          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>Gastos por categoría</div>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <input
+            type="text"
+            placeholder="Hazme una pregunta sobre tus finanzas..."
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
+            style={{ width: '100%', background: '#020617', border: '1px solid #1e293b', borderRadius: 10, padding: '12px 16px', color: '#fff', fontSize: 13, outline: 'none' }}
+          />
+          <button style={{ position: 'absolute', right: 8, background: '#1e293b', border: 'none', color: '#94a3b8', borderRadius: 6, padding: 6, cursor: 'pointer' }}>
+            <Send size={14} />
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {['En que estoy gastando mas?', 'Analiza mis gastos', 'Como ahorrar este mes?', 'Hazme un presupuesto'].map((q, i) => (
+            <button key={i} onClick={() => setAiPrompt(q)} style={{ background: '#0f172a', border: '1px solid #1e293b', color: '#94a3b8', padding: '6px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer' }}>
+              {q}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Resumen 4 Tarjetas */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+        <StatCard icon="📈" label="Ingreso mensual" value={`RD$${displayIncome.toLocaleString()}`} color="#10b981" sub="Tú + pareja" />
+        <StatCard icon="📉" label="Gastos fijos" value={`RD$${displayFixed.toLocaleString()}`} color="#f43f5e" sub="Este mes" />
+        <StatCard icon="💳" label="Deuda tarjetas" value={`RD$${totalDebt.toLocaleString()}`} color="#ffd60a" sub={`${cards.length} tarjetas`} />
+        <StatCard icon="🎯" label="Disponible" value={`RD$${available.toLocaleString()}`} color="#38bdf8" sub="Para metas/ahorro" />
+      </div>
+
+      {/* Gráficas */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+        
+        {/* Flujo del año */}
+        <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 16, padding: 20 }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: 15, fontWeight: 600 }}>Flujo del año</h3>
+          <div style={{ width: '100%', height: 220 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData}>
+                <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} />
+                <YAxis hide />
+                <Tooltip contentStyle={{ background: '#020617', border: '1px solid #1e293b', borderRadius: 8, color: '#fff', fontSize: 12 }} />
+                <Area type="monotone" dataKey="gastos" stroke="#f43f5e" fill="#f43f5e20" strokeWidth={2} />
+                <Area type="monotone" dataKey="ingresos" stroke="#10b981" fill="#10b98120" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Gastos por Categoría */}
+        <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 16, padding: 20 }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: 15, fontWeight: 600 }}>Gastos por categoría</h3>
           {pieData.length === 0 ? (
-            <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 13 }}>Sin datos aún</div>
+            <p style={{ textAlign: 'center', color: '#64748b', fontSize: 13, marginTop: 60 }}>Sin datos aún</p>
           ) : (
-            <>
-              <ResponsiveContainer width="100%" height={120}>
+            <div style={{ width: '100%', height: 220 }}>
+              <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={35} outerRadius={55} dataKey="value" paddingAngle={2}>
-                    {pieData.map((_,i) => <Cell key={i} fill={COLORS[i%COLORS.length]} />)}
+                  <Pie data={pieData} innerRadius={55} outerRadius={80} dataKey="value" paddingAngle={4}>
+                    {pieData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
                   </Pie>
-                  <Tooltip contentStyle={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, fontSize: 12 }} formatter={v=>`RD$${Number(v).toLocaleString()}`} />
+                  <Tooltip contentStyle={{ background: '#020617', border: '1px solid #1e293b', borderRadius: 8, color: '#fff', fontSize: 12 }} />
                 </PieChart>
               </ResponsiveContainer>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 12px', marginTop: 8 }}>
-                {pieData.slice(0,4).map((d,i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text2)' }}>
-                    <div style={{ width: 7, height: 7, borderRadius: 2, background: COLORS[i%COLORS.length] }} />
-                    {CAT_ICONS[d.name]||'📦'} {d.name}
-                  </div>
-                ))}
-              </div>
-            </>
+            </div>
           )}
         </div>
+
       </div>
 
-      {cards.length > 0 && (
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>Tarjetas</div>
-            <Link to="/cards" style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4 }}>Ver todas <ArrowRight size={12} /></Link>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {cards.map(c => {
-              const pct = (Number(c.current_balance)/Number(c.credit_limit))*100
-              const color = pct>70?'var(--red)':pct>40?'var(--yellow)':'var(--green)'
-              return (
-                <div key={c.id}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-                    <span style={{ fontWeight: 500 }}>💳 {c.bank_name} — {c.card_name}</span>
-                    <span style={{ color, fontWeight: 600 }}>RD${Number(c.current_balance).toLocaleString()}</span>
-                  </div>
-                  <div style={{ height: 4, background: 'var(--bg4)', borderRadius: 2 }}>
-                    <div style={{ width:`${Math.min(pct,100)}%`, height:'100%', background:color, borderRadius:2, transition:'width .5s' }} />
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--text3)', marginTop:4 }}>
-                    <span>{pct.toFixed(0)}% usado</span>
-                    <span>Vence {c.due_date}</span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
+      {/* Modal del Escáner */}
+      {showScan && (
+        <ScanStatement
+          onClose={() => setShowScan(false)}
+          onSaved={() => load()}
+        />
       )}
 
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>Últimos movimientos</div>
-          <Link to="/transactions" style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4 }}>Ver todos <ArrowRight size={12} /></Link>
-        </div>
-        {transactions.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text3)' }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>💸</div>
-            <p style={{ fontSize: 13 }}>Sin movimientos. Agrega el primero.</p>
-            <button onClick={() => setShowQuickAdd(true)} className="btn-ghost" style={{ marginTop: 12, fontSize: 13 }}>+ Agregar movimiento</button>
-          </div>
-        ) : transactions.slice(0,6).map((t,i) => (
-          <div key={t.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom: i<5?'1px solid var(--border)':'none' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-              <div style={{ width:36, height:36, borderRadius:10, background:t.type==='income'?'rgba(0,208,132,0.1)':'rgba(255,77,109,0.1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:17 }}>
-                {CAT_ICONS[t.category]||'📦'}
-              </div>
-              <div>
-                <div style={{ fontSize:13, fontWeight:500 }}>{t.description}</div>
-                <div style={{ fontSize:11, color:'var(--text3)' }}>{t.category} · {t.date}</div>
-              </div>
-            </div>
-            <div style={{ fontSize:14, fontWeight:600, color:t.type==='income'?'var(--green)':'var(--red)' }}>
-              {t.type==='income'?'+':'-'}RD${Number(t.amount).toLocaleString()}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {goals.length > 0 && (
-        <div className="card">
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-            <div style={{ fontSize:14, fontWeight:600 }}>Metas de ahorro</div>
-            <Link to="/goals" style={{ fontSize:12, color:'var(--text2)', display:'flex', alignItems:'center', gap:4 }}>Ver todas <ArrowRight size={12} /></Link>
-          </div>
-          {goals.map(g => {
-            const pct = (Number(g.current_amount)/Number(g.target_amount))*100
-            return (
-              <div key={g.id} style={{ marginBottom:12 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:6 }}>
-                  <span style={{ fontWeight:500 }}>🎯 {g.name}</span>
-                  <span style={{ color:'var(--green)', fontWeight:600 }}>{pct.toFixed(0)}%</span>
-                </div>
-                <div style={{ height:6, background:'var(--bg4)', borderRadius:3 }}>
-                  <div style={{ width:`${Math.min(pct,100)}%`, height:'100%', background:'var(--green)', borderRadius:3, transition:'width .5s' }} />
-                </div>
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--text3)', marginTop:4 }}>
-                  <span>RD${Number(g.current_amount).toLocaleString()} ahorrado</span>
-                  <span>Meta: RD${Number(g.target_amount).toLocaleString()}</span>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {showQuickAdd && <QuickAdd onClose={() => setShowQuickAdd(false)} onSaved={load} />}
-      {showScan && <ScanStatement onClose={() => setShowScan(false)} onSaved={load} />}
-
-      <button onClick={() => setShowQuickAdd(true)} style={{ position:'fixed', bottom:24, right:24, width:52, height:52, borderRadius:'50%', background:'var(--green)', color:'#000', fontSize:24, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 4px 20px rgba(0,208,132,0.4)', zIndex:200 }}>
-        <Plus size={22} />
-      </button>
     </div>
   )
 }
