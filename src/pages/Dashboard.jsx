@@ -338,7 +338,7 @@ ${recentTx || 'Sin transacciones'}
             </h3>
           </div>
           <p style={{ margin: 0, fontSize: 12, color: '#cbd5e1', maxWidth: 400 }}>
-            Te quedan <b>{currSymbol}{metrics.moneyAvailable.toLocaleString()}</b> libres para consumir en los próximos <b>{currentCycle.daysRemaining} días</b>.
+            Te quedan <b>{currSymbol}{fmt(metrics?.moneyAvailable)}</b> libres para consumir en los próximos <b>{currentCycle.daysRemaining} días</b>.
           </p>
         </div>
       </div>
