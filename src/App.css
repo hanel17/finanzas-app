@@ -182,3 +182,41 @@
     border-right-color: var(--border);
   }
 }
+
+
+/* ==========================================
+   AJUSTE DE RESPONSIVIDAD PARA TELÉFONOS
+   ========================================== */
+@media (max-width: 768px) {
+  /* Contenedor principal responsive */
+  body, #root {
+    overflow-x: hidden !important;
+  }
+
+  /* Oculta la barra lateral fija que aplasta el contenido */
+  aside {
+    display: none !important;
+  }
+
+  /* Asegura que la pantalla principal tome el 100% del ancho */
+  main {
+    width: 100% !important;
+    max-width: 100vw !important;
+    padding: 12px !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Ajusta rejillas/grids de tarjetas para que se pongan una debajo de otra */
+  div[style*="display: flex"], 
+  div[style*="display: grid"] {
+    flex-wrap: wrap !important;
+    max-width: 100% !important;
+  }
+
+  /* Ajuste de contenedores para evitar scroll horizontal */
+  div {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
