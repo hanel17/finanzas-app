@@ -1,56 +1,107 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { Upload, CheckCircle2, AlertCircle, Sparkles, Loader2 } from 'lucide-react'
+import { Upload, CheckCircle2, AlertCircle, Sparkles, Loader2, RefreshCw } from 'lucide-react'
 
 export default function ScanStatement({ onClose, onSaved }) {
   const { user } = useAuth()
-  const [file, setFile] = useState(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState('DOP') // 'DOP' | 'USD'
+  const [activeTab, setActiveTab] = useState('DOP')
   const [result, setResult] = useState(null)
   const [errorMsg, setErrorMsg] = useState(null)
 
-  // Simulación de OCR + Groq Parser dinámico (Estructura real)
-  const handleUpload = async (e) => {
+  // Llamada directa a Groq API via Fetch (Sin necesidad de librerías extra)
+  const processTextWithGroq = async (rawText) => {
+    const apiKey = import.meta.env.VITE_GROQ_API_KEY
+    if (!apiKey) {
+      throw new Error("No se encontró la clave VITE_GROQ_API_KEY en las variables de entorno.")
+    }
+
+    const systemPrompt = `
+Eres un extractor de datos financieros experto. Analiza el texto del documento.
+REGLAS:
+1. "currency": "DOP" o "USD". Separa estrictamente consumos en dólares de pesos.
+2. "type": "income" (pagos, devoluciones, abonos) o "expense" (compras, consumos).
+3. "category": "Supermercado", "Alimentación", "Transporte", "Servicios", "Hogar", "Salud", "Entretenimiento", "Suscripciones", "Abono a Tarjeta", u "Otros".
+
+Responde ÚNICAMENTE en JSON con esta estructura exacta:
+{
+  "summary": {
+    "dop_expense": 0,
+    "dop_income": 0,
+    "usd_expense": 0,
+    "usd_income": 0
+  },
+  "transactions": [
+    {
+      "id": "1",
+      "date": "YYYY-MM-DD",
+      "description": "Nombre comercio",
+      "amount": 0.00,
+      "type": "expense",
+      "category": "Categoría",
+      "currency": "DOP"
+    }
+  ]
+}
+`
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        response_format: { type: 'json_object' },
+        temperature: 0.1,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Extrae todas las transacciones de este texto:
+
+${rawText}` }
+        ]
+      })
+    })
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}))
+      throw new Error(errData.error?.message || "Error al conectar con la API de Groq.")
+    }
+
+    const data = await response.json()
+    const parsedData = JSON.parse(data.choices[0]?.message?.content || '{}')
+
+    if (parsedData.transactions) {
+      parsedData.transactions = parsedData.transactions.map((t, idx) => ({
+        ...t,
+        id: t.id || `tx_${idx}_${Date.now()}`,
+        selected: true
+      }))
+    }
+
+    return parsedData
+  }
+
+  const handleFileUpload = async (e) => {
     const selectedFile = e.target.files?.[0]
     if (!selectedFile) return
-    setFile(selectedFile)
     setAnalyzing(true)
     setErrorMsg(null)
 
     try {
-      // AQUÍ IRÍA LA LLAMADA A TU BACKEND / GROQ SERVICE
-      // Mantenemos la estructura procesada lista para guardar
-      setTimeout(() => {
-        setAnalyzing(false)
-        setResult({
-          summary: {
-            dop_expense: 20602.32,
-            dop_income: 33438.82,
-            usd_expense: 18.46,
-            usd_income: 38.46,
-          },
-          transactions: [
-            // Transacciones DOP
-            { id: '1', date: '2026-06-15', description: 'MI GUSTO MELLA CHARLES', amount: 220, type: 'expense', category: 'Alimentación', currency: 'DOP', selected: true },
-            { id: '2', date: '2026-06-24', description: 'BRAVO CHARLES DE GAULLE', amount: 4665, type: 'expense', category: 'Supermercado', currency: 'DOP', selected: true },
-            { id: '3', date: '2026-06-26', description: 'PAGOS TARJETAS INTERNET', amount: 28000, type: 'income', category: 'Abono a Tarjeta', currency: 'DOP', selected: true },
-            { id: '4', date: '2026-07-10', description: 'PAGOS TARJETAS INTERNET', amount: 5100, type: 'income', category: 'Abono a Tarjeta', currency: 'DOP', selected: true },
-            { id: '5', date: '2026-07-13', description: 'DEVOLUCION 7% BRAVO JUNIO', amount: 326.55, type: 'income', category: 'Reembolsos / Cashback', currency: 'DOP', selected: true },
-            
-            // Transacciones USD
-            { id: '6', date: '2026-06-25', description: 'APPLE.COM BILL', amount: 0.99, type: 'expense', category: 'Suscripciones', currency: 'USD', selected: true },
-            { id: '7', date: '2026-07-08', description: 'SPOTIFY, STOCKHOLM', amount: 6.49, type: 'expense', category: 'Suscripciones', currency: 'USD', selected: true },
-            { id: '8', date: '2026-07-10', description: 'NETFLIX.COM', amount: 9.99, type: 'expense', category: 'Suscripciones', currency: 'USD', selected: true },
-            { id: '9', date: '2026-07-13', description: 'DEVOLUCION APPS DIGITALES', amount: 0.82, type: 'income', category: 'Reembolsos / Cashback', currency: 'USD', selected: true }
-          ]
-        })
-      }, 1500)
+      const text = await selectedFile.text()
+      const textToProcess = text.length > 50 ? text : "DOCUMENTO SIN TEXTO SUFICIENTE"
+      
+      const parsedResult = await processTextWithGroq(textToProcess)
+      setResult(parsedResult)
     } catch (err) {
+      console.error(err)
+      setErrorMsg(err.message || "Error al procesar el documento.")
+    } finally {
       setAnalyzing(false)
-      setErrorMsg("Error al procesar el documento. Intenta nuevamente.")
     }
   }
 
@@ -68,11 +119,10 @@ export default function ScanStatement({ onClose, onSaved }) {
     }))
   }
 
-  // GUARDADO REAL EN SUPABASE
+  // Guardado real en Supabase
   const handleSave = async () => {
     if (!result) return
     
-    // Filtrar solo las seleccionadas por el usuario (de ambas monedas)
     const selectedTxs = result.transactions.filter(t => t.selected)
     
     if (selectedTxs.length === 0) {
@@ -83,35 +133,33 @@ export default function ScanStatement({ onClose, onSaved }) {
     setSaving(true)
     setErrorMsg(null)
 
-    // Formatear filas para insertar en la tabla transactions de Supabase
     const payload = selectedTxs.map(t => ({
       user_id: user.id,
-      date: t.date,
+      date: t.date || new Date().toISOString().split('T')[0],
       description: t.description,
       amount: Number(t.amount),
-      type: t.type, // 'expense' o 'income'
+      type: t.type,
       category: t.category || 'Otros',
       currency: t.currency || 'DOP'
     }))
 
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('transactions')
         .insert(payload)
 
       if (error) {
-        console.error("Error insertando en Supabase:", error)
-        setErrorMsg("Error al guardar en la base de datos: " + error.message)
+        setErrorMsg("Error guardando en Supabase: " + error.message)
         setSaving(false)
         return
       }
 
       setSaving(false)
-      if (onSaved) onSaved() // Recargar Dashboard
-      onClose() // Cerrar Modal
+      if (onSaved) onSaved()
+      onClose()
     } catch (err) {
-      console.error("Error catch:", err)
-      setErrorMsg("Ocurrió un fallo inesperado al guardar.")
+      console.error(err)
+      setErrorMsg("Error inesperado al conectar con Supabase.")
       setSaving(false)
     }
   }
@@ -121,7 +169,7 @@ export default function ScanStatement({ onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 16, width: '100%', maxWidth: 680, padding: 24, color: '#fff', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 16, width: '100%', maxWidth: 700, padding: 24, color: '#fff', maxHeight: '90vh', overflowY: 'auto' }}>
         
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -137,30 +185,29 @@ export default function ScanStatement({ onClose, onSaved }) {
           </div>
         )}
 
-        {/* Cargar Archivo */}
+        {/* Formulario de Carga */}
         {!result && (
           <div style={{ border: '2px dashed #334155', borderRadius: 12, padding: 40, textAlign: 'center', background: '#1e293b40', cursor: 'pointer', position: 'relative' }}>
-            <input type="file" accept=".pdf,image/*" onChange={handleUpload} disabled={analyzing} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
+            <input type="file" accept=".pdf,image/*,.txt" onChange={handleFileUpload} disabled={analyzing} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
             {analyzing ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                 <Loader2 size={32} color="#818cf8" className="animate-spin" />
-                <p style={{ margin: 0, fontWeight: 500 }}>Analizando documento con IA...</p>
+                <p style={{ margin: 0, fontWeight: 500 }}>Procesando documento con IA...</p>
               </div>
             ) : (
               <div>
                 <Upload size={32} color="#818cf8" style={{ marginBottom: 12 }} />
-                <p style={{ margin: 0, fontWeight: 500 }}>Sube una foto de un recibo, factura o estado en PDF</p>
-                <span style={{ fontSize: 12, color: '#64748b' }}>La IA extraerá comercios, montos y categorías automáticamente</span>
+                <p style={{ margin: 0, fontWeight: 500 }}>Sube tu estado de cuenta, factura o recibo</p>
+                <span style={{ fontSize: 12, color: '#64748b' }}>La IA identificará los consumos y abonos automáticamente</span>
               </div>
             )}
           </div>
         )}
 
-        {/* Resultados procesados */}
+        {/* Resultados */}
         {result && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             
-            {/* Tabs DOP / USD */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #334155', paddingBottom: 12 }}>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
@@ -196,19 +243,19 @@ export default function ScanStatement({ onClose, onSaved }) {
               <div>
                 <span style={{ fontSize: 11, color: '#94a3b8' }}>Gastos en {activeTab}</span>
                 <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#f43f5e' }}>
-                  {activeTab === 'DOP' ? 'RD$' : '$'}{activeTab === 'DOP' ? result.summary.dop_expense.toLocaleString() : result.summary.usd_expense.toLocaleString()}
+                  {activeTab === 'DOP' ? 'RD$' : '$'}{activeTab === 'DOP' ? (result.summary?.dop_expense || 0).toLocaleString() : (result.summary?.usd_expense || 0).toLocaleString()}
                 </p>
               </div>
               <div>
                 <span style={{ fontSize: 11, color: '#94a3b8' }}>Abonos / Ingresos en {activeTab}</span>
                 <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#10b981' }}>
-                  {activeTab === 'DOP' ? 'RD$' : '$'}{activeTab === 'DOP' ? result.summary.dop_income.toLocaleString() : result.summary.usd_income.toLocaleString()}
+                  {activeTab === 'DOP' ? 'RD$' : '$'}{activeTab === 'DOP' ? (result.summary?.dop_income || 0).toLocaleString() : (result.summary?.usd_income || 0).toLocaleString()}
                 </p>
               </div>
             </div>
 
             {/* Lista de Transacciones */}
-            <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid #334155', borderRadius: 8 }}>
+            <div style={{ maxHeight: 280, overflowY: 'auto', border: '1px solid #334155', borderRadius: 8 }}>
               {currentTxs.length === 0 ? (
                 <p style={{ padding: 20, textAlign: 'center', color: '#64748b', fontSize: 13 }}>No hay movimientos en esta moneda.</p>
               ) : (
@@ -221,7 +268,7 @@ export default function ScanStatement({ onClose, onSaved }) {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: tx.type === 'income' ? '#10b981' : '#f87171' }}>
-                        {tx.type === 'income' ? '+' : '-'}{tx.currency === 'DOP' ? 'RD$' : '$'}{tx.amount.toLocaleString()}
+                        {tx.type === 'income' ? '+' : '-'}{tx.currency === 'DOP' ? 'RD$' : '$'}{Number(tx.amount).toLocaleString()}
                       </p>
                       <span style={{ fontSize: 10, color: '#64748b' }}>{tx.date}</span>
                     </div>
@@ -231,14 +278,20 @@ export default function ScanStatement({ onClose, onSaved }) {
             </div>
 
             {/* Acciones */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
-              <button onClick={onClose} disabled={saving} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #334155', color: '#cbd5e1', borderRadius: 8, cursor: 'pointer' }}>
-                Cancelar
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+              <button onClick={() => setResult(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <RefreshCw size={14} /> Reintentar otro
               </button>
-              <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', background: '#4f46e5', border: 'none', color: '#fff', borderRadius: 8, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
-                {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                {saving ? "Guardando..." : "Guardar Seleccionados"}
-              </button>
+              
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={onClose} disabled={saving} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #334155', color: '#cbd5e1', borderRadius: 8, cursor: 'pointer' }}>
+                  Cancelar
+                </button>
+                <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', background: '#4f46e5', border: 'none', color: '#fff', borderRadius: 8, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                  {saving ? "Guardando..." : "Guardar Seleccionados"}
+                </button>
+              </div>
             </div>
 
           </div>
