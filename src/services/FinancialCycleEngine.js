@@ -116,9 +116,38 @@ export class FinancialCycleEngine {
 
     const cycleSpent = cycleTxs.filter(t => t.type === "expense").reduce((sum, t) => sum + Number(t.amount || 0), 0)
 
-    // Solo contar como comprometido lo que NO ha sido pagado aun en este ciclo
-    const unpaidFixed = fixedExpenses.filter(e => !this.isFixedExpensePaid(e, cycleTxs))
-    const paidFixed = fixedExpenses.filter(e => this.isFixedExpensePaid(e, cycleTxs))
+    // Determinar qué gastos fijos caen dentro del ciclo actual
+    const cycleStart = new Date(start)
+    const cycleEnd = new Date(end)
+    const startDay = cycleStart.getDate()
+    const endDay = cycleEnd.getDate()
+    const crossesMonth = cycleStart.getMonth() !== cycleEnd.getMonth()
+
+    const fixedInCycle = fixedExpenses.filter(e => {
+      const due = Number(e.due_day)
+      if (!due) return true // sin dia definido, siempre aplica
+      if (crossesMonth) {
+        // Ciclo cruza mes: ej 27 jul → 11 ago: due_day >= 27 OR due_day <= 11
+        return due >= startDay || due <= endDay
+      } else {
+        // Ciclo dentro del mismo mes
+        return due >= startDay && due <= endDay
+      }
+    })
+
+    const fixedOutOfCycle = fixedExpenses.filter(e => {
+      const due = Number(e.due_day)
+      if (!due) return false
+      if (crossesMonth) {
+        return due > endDay && due < startDay
+      } else {
+        return due < startDay || due > endDay
+      }
+    })
+
+    // De los que caen en este ciclo, ver cuales ya fueron pagados
+    const unpaidFixed = fixedInCycle.filter(e => !this.isFixedExpensePaid(e, cycleTxs))
+    const paidFixed = fixedInCycle.filter(e => this.isFixedExpensePaid(e, cycleTxs))
 
     const committedMoney = unpaidFixed.reduce((sum, e) => sum + Number(e.amount || 0), 0)
     const paidCommitted = paidFixed.reduce((sum, e) => sum + Number(e.amount || 0), 0)
@@ -136,6 +165,8 @@ export class FinancialCycleEngine {
       paidCommitted,
       unpaidFixed,
       paidFixed,
+      fixedOutOfCycle,
+      fixedInCycle,
       reallyAvailable,
       dailyRecommended,
       cycleTxs

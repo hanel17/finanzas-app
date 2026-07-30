@@ -340,6 +340,40 @@ ${recentTx || 'Sin transacciones'}
         </div>
       </div>
 
+      {/* UPCOMING PAYMENTS - fuera de este ciclo */}
+      {metrics?.fixedOutOfCycle?.length > 0 && (
+        <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 16, padding: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 16 }}>📅</span>
+            <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Próximos pagos (fuera de este ciclo)</h4>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {metrics.fixedOutOfCycle.map((e, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#020617', borderRadius: 10, border: '1px solid #1e293b' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>
+                    {e.category === 'hogar' ? '🏠' : e.category === 'servicios' ? '⚡' : e.category === 'salud' ? '💊' : '📦'}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: '#e2e8f0' }}>{e.name}</div>
+                    <div style={{ fontSize: 11, color: '#64748b' }}>
+                      {e.due_day ? `Vence día ${e.due_day} del próximo ciclo` : 'Próximo ciclo'}
+                    </div>
+                  </div>
+                </div>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#f59e0b' }}>RD${Number(e.amount).toLocaleString()}</span>
+              </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 12px', fontSize: 12, color: '#64748b' }}>
+              <span>Total comprometido próximo ciclo</span>
+              <span style={{ color: '#f59e0b', fontWeight: 600 }}>
+                RD${metrics.fixedOutOfCycle.reduce((s,e) => s+Number(e.amount),0).toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ASISTENTE IA ENFOCADO EN CICLOS */}
       <div style={{ background: '#090d16', border: '1px solid #1e293b', borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
