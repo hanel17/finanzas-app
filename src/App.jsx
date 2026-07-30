@@ -1,11 +1,17 @@
-import { useState } from 'react'
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+
+// Páginas del proyecto
 import Dashboard from './pages/Dashboard'
 import CycleConfig from './pages/CycleConfig'
+import Transactions from './pages/Transactions'
+import Cards from './pages/Cards'
+import Goals from './pages/Goals'
+import Insights from './pages/Insights'
+import Copilot from './pages/Copilot'
+
 import { LayoutDashboard, ArrowLeftRight, CreditCard, Target, Lightbulb, Bot, Sliders, Wallet } from 'lucide-react'
 
-// Componente Layout con Sidebar Lateral
 function MainLayout({ children }) {
   const location = useLocation()
   const { user } = useAuth()
@@ -23,10 +29,9 @@ function MainLayout({ children }) {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#020617', color: '#fff' }}>
       
-      {/* Sidebar Lateral Izquierda */}
+      {/* Sidebar Lateral */}
       <aside style={{ width: 240, background: '#090d16', borderRight: '1px solid #1e293b', padding: 20, display: 'flex', flexDirection: 'column', gap: 24, flexShrink: 0 }}>
         
-        {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ background: '#312e81', padding: 8, borderRadius: 10 }}>
             <Wallet size={20} color="#818cf8" />
@@ -37,7 +42,6 @@ function MainLayout({ children }) {
           </div>
         </div>
 
-        {/* Menú de Navegación */}
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
           {navItems.map((item) => {
             const isActive = location.pathname === item.path
@@ -48,7 +52,7 @@ function MainLayout({ children }) {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justify: 'space-between',
+                  justifyContent: 'space-between',
                   padding: '10px 14px',
                   borderRadius: 10,
                   textDecoration: 'none',
@@ -75,7 +79,7 @@ function MainLayout({ children }) {
         </nav>
       </aside>
 
-      {/* Área de Contenido Principal */}
+      {/* Área Principal */}
       <main style={{ flex: 1, overflowY: 'auto' }}>
         {children}
       </main>
@@ -90,6 +94,11 @@ export default function App() {
       <MainLayout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/movimientos" element={<Transactions />} />
+          <Route path="/tarjetas" element={<Cards />} />
+          <Route path="/metas" element={<Goals />} />
+          <Route path="/insights" element={<Insights />} />
+          <Route path="/ia" element={<Copilot />} />
           <Route path="/cycle-config" element={<CycleConfig />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
