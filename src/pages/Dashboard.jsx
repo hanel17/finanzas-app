@@ -38,43 +38,17 @@ export default function Dashboard() {
     </div>
   )
 
-  const { profile, cards, expenses, transactions, goals } = data
+    const { profile, cards, expenses, transactions, goals } = data
   const totalIncome = (profile?.monthly_income||0) + (profile?.spouse_income||0)
   const totalFixed = expenses.reduce((s,e) => s+Number(e.amount), 0)
   const totalDebt = cards.reduce((s,c) => s+Number(c.current_balance), 0)
   const monthTx = transactions.filter(t => t.date?.startsWith(new Date().toISOString().slice(0,7)))
   const monthExpenses = monthTx.filter(t => t.type==='expense').reduce((s,t)=>s+Number(t.amount),0)
-  // Cálculos dinámicos con respaldo en transacciones reales
+  const monthIncome = monthTx.filter(t => t.type==='income').reduce((s,t)=>s+Number(t.amount),0)
   
   const displayIncome = totalIncome > 0 ? totalIncome : monthIncome
   const displayFixed = totalFixed > 0 ? totalFixed : monthExpenses
   const available = displayIncome - displayFixed
-
-  const sourceForPie = expenses.length > 0 ? expenses : transactions.filter(t => t.type === 'expense')
-  const pieData = sourceForPie.reduce((acc, e) => {
-    const cat = e.category || 'Otros'
-    const f = acc.find(a => a.name === cat)
-    if (f) f.value += Number(e.amount || 0)
-    else acc.push({ name: cat, value: Number(e.amount || 0) })
-    return acc
-  }, [])
-
-  const chartData = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'].slice(0,new Date().getMonth()+1).map((m,i) => {
-    const mo = String(i+1).padStart(2,'0')
-    const txs = transactions.filter(t=>t.date?.includes(`-${mo}-`))
-    return { name: m, gastos: txs.filter(t=>t.type==='expense').reduce((s,t)=>s+Number(t.amount),0), ingresos: txs.filter(t=>t.type==='income').reduce((s,t)=>s+Number(t.amount),0) }
-  })
-
-  const StatCard = ({ icon, label, value, color, sub }) => (
-    <div className="card fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ width: 32, height: 32, borderRadius: 8, background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color }}>{icon}</div>
-        <span style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 500 }}>{label}</span>
-      </div>
-      <div style={{ fontSize: 22, fontWeight: 700, color, letterSpacing: '-0.5px' }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{sub}</div>}
-    </div>
-  )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
