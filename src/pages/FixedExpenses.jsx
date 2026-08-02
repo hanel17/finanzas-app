@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Plus, Trash2, Edit2 } from 'lucide-react'
 
+const fmt = (n) => Math.round(n || 0).toLocaleString('es-DO')
 const CATEGORIES = ['hogar','comida','transporte','servicios','salud','educacion','entretenimiento','tarjeta','diezmo','ahorro','gas','otros']
 const CAT_ICONS = { hogar:'🏠', comida:'🍔', transporte:'🚗', servicios:'⚡', salud:'💊', educacion:'📚', entretenimiento:'🎬', tarjeta:'💳', diezmo:'🙏', ahorro:'🏦', gas:'⛽', otros:'📦' }
 
@@ -62,7 +63,7 @@ export default function FixedExpenses() {
 
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 20px', marginBottom: 20, display: 'flex', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 13, color: 'var(--text2)' }}>Total comprometido mensual</span>
-        <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--yellow)' }}>RD${total.toLocaleString()}</span>
+        <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--yellow)' }}>RD${fmt(total)}</span>
       </div>
 
       {showForm && (
@@ -124,7 +125,7 @@ export default function FixedExpenses() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--yellow)' }}>RD${Number(e.amount).toLocaleString()}</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--yellow)' }}>RD${fmt(Number(e.amount))}</span>
                   <button onClick={() => handleEdit(e)} style={{ background: 'transparent', color: 'var(--text3)', border: 'none', cursor: 'pointer', padding: 4 }}><Edit2 size={15}/></button>
                   <button onClick={() => handleDelete(e.id)} style={{ background: 'transparent', color: 'var(--text3)', border: 'none', cursor: 'pointer', padding: 4 }}><Trash2 size={15}/></button>
                 </div>
