@@ -155,6 +155,7 @@ export default function App() {
           <Route path="/ia" element={<AI />} />
           <Route path="/cycle-config" element={<CycleConfig />} />
           <Route path="/ahorros" element={<Savings />} />
+          <Route path="/gastos-fijos" element={<FixedExpenses />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="*" element={<Navigate to="/" replace />} />
