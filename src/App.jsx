@@ -34,6 +34,8 @@ function MainLayout({ children }) {
     { path: '/metas', label: 'Metas', icon: <Target size={18} /> },
     { path: '/insights', label: 'Insights', icon: <Lightbulb size={18} /> },
     { path: '/ia', label: 'Asistente IA', icon: <Bot size={18} />, badge: 'NEW' },
+    { path: '/ahorros', label: 'Ahorros', icon: <PiggyBank size={18} /> },
+    { path: '/gastos-fijos', label: 'Gastos Fijos', icon: <Sliders size={18} /> },
     { path: '/cycle-config', label: 'Ciclo Financiero', icon: <Sliders size={18} /> },
   ]
 
