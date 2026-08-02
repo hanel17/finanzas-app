@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import CycleConfig from './pages/CycleConfig'
 import Savings from './pages/Savings'
 import FixedExpenses from './pages/FixedExpenses'
+import Onboarding from './pages/Onboarding'
 import Transactions from './pages/Transactions'
 import Cards from './pages/Cards'
 import Goals from './pages/Goals'
@@ -157,6 +158,7 @@ export default function App() {
           <Route path="/ahorros" element={<Savings />} />
           <Route path="/gastos-fijos" element={<FixedExpenses />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/register" element={<Register />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
