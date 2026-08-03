@@ -315,7 +315,7 @@ export default function Onboarding() {
                       style={{ ...s.inp, padding: "6px 10px", fontSize: 12, marginTop: 0 }}>
                       {CATEGORIES.map(c => <option key={c} value={c}>{CAT_ICONS[c]} {c}</option>)}
                     </select>
-                    <input type="number" min="1" max="31" placeholder="Día vence" value={exp.due_day}
+                    <input type="number" min="1" max="31" placeholder="Día del mes (ej: 10)" value={exp.due_day}
                       onChange={e => updateExpense(i, "due_day", e.target.value)}
                       style={{ ...s.inp, padding: "6px 10px", fontSize: 12, marginTop: 0 }} />
                     {form.expenses.length > 1 && (
