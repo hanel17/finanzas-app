@@ -24,7 +24,7 @@ function MainLayout({ children }) {
   const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  if (location.pathname === '/login' || location.pathname === '/register') {
+  if (location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/onboarding') {
     return children
   }
 
