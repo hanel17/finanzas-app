@@ -360,7 +360,7 @@ ${recentTx || 'Sin transacciones'}
 
       {/* DETALLE DE DINERO COMPROMETIDO VS LIBRE */}
       {/* INGRESO ESPERADO - confirmar recibo */}
-      {metrics?.totalIncome === Number(data.cycleConfig?.expected_income || 0) && metrics?.cycleSpent === 0 && (
+      {!metrics?.incomeConfirmed && Number(data.cycleConfig?.expected_income || 0) > 0 && (
         <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 14, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>💵 ¿Ya recibiste tu pago?</div>
@@ -377,7 +377,7 @@ ${recentTx || 'Sin transacciones'}
       )}
 
       {/* INGRESO RECIBIDO - resumen */}
-      {metrics?.totalIncome > 0 && metrics?.totalIncome !== Number(data.cycleConfig?.expected_income || 0) && (
+      {metrics?.incomeConfirmed && (
         <div style={{ background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.15)', borderRadius: 14, padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 20 }}>✅</span>
@@ -420,7 +420,7 @@ ${recentTx || 'Sin transacciones'}
             {currSymbol}{fmt(metrics?.moneyInHand)}
           </h2>
           <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
-            Ingresos + saldo anterior
+            {metrics?.incomeConfirmed ? "Ingreso confirmado" : `Esperado: RD${Math.round(metrics?.expectedIncome || 0).toLocaleString("es-DO")}`}
           </div>
           {metrics?.cycleSavingsOut > 0 && (
             <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 2 }}>

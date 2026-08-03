@@ -141,10 +141,11 @@ export class FinancialEngine {
     const cycleIncome = cycleTxs.filter(t => t.type === "income").reduce((s,t) => s + Number(t.amount), 0)
     const cycleSpent = cycleTxs.filter(t => t.type === "expense").reduce((s,t) => s + Number(t.amount), 0)
 
-    // Ingresos: usar los ingresos registrados como transacciones
-    // Si no hay ninguno registrado, usar el expected como referencia
-    const totalIncome = cycleIncome > 0 ? cycleIncome : Number(incomeConfig || 0)
+    // Ingresos: SOLO usar ingresos registrados como transacciones reales
+    // expected_income es solo referencia para el banner de confirmacion
+    const totalIncome = cycleIncome
     const incomeConfirmed = cycleIncome > 0
+    const expectedIncome = Number(incomeConfig || 0)
 
     // Ahorros enviados en este ciclo
     const cycleSavingsOut = savings
@@ -195,6 +196,7 @@ export class FinancialEngine {
       totalIncome,
       incomeConfirmed,
       cycleIncome,
+      expectedIncome,
       moneyInHand,
       cycleSpent,
       totalUnpaid,
