@@ -141,8 +141,10 @@ export class FinancialEngine {
     const cycleIncome = cycleTxs.filter(t => t.type === "income").reduce((s,t) => s + Number(t.amount), 0)
     const cycleSpent = cycleTxs.filter(t => t.type === "expense").reduce((s,t) => s + Number(t.amount), 0)
 
-    // Ingresos: si hay registrados en el ciclo usarlos, sino usar configuracion
+    // Ingresos: usar los ingresos registrados como transacciones
+    // Si no hay ninguno registrado, usar el expected como referencia
     const totalIncome = cycleIncome > 0 ? cycleIncome : Number(incomeConfig || 0)
+    const incomeConfirmed = cycleIncome > 0
 
     // Ahorros enviados en este ciclo
     const cycleSavingsOut = savings
@@ -191,6 +193,8 @@ export class FinancialEngine {
       // Core numbers
       carryOver,
       totalIncome,
+      incomeConfirmed,
+      cycleIncome,
       moneyInHand,
       cycleSpent,
       totalUnpaid,

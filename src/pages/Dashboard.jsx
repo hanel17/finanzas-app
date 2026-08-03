@@ -169,6 +169,21 @@ export default function Dashboard() {
     loadData()
   }
 
+  const handleConfirmIncome = async (amount) => {
+    const { data: authData } = await supabase.auth.getUser()
+    const uid = authData?.user?.id || user?.id
+    if (!uid) return
+    await supabase.from('transactions').insert({
+      user_id: uid,
+      type: 'income',
+      amount: Number(amount),
+      description: 'Ingreso del ciclo',
+      category: 'ingreso',
+      date: new Date().toISOString().split('T')[0]
+    })
+    loadData()
+  }
+
   const askAI = async (q) => {
     const question = q || aiPrompt.trim()
     if (!question || aiLoading) return
@@ -344,6 +359,41 @@ ${recentTx || 'Sin transacciones'}
       </div>
 
       {/* DETALLE DE DINERO COMPROMETIDO VS LIBRE */}
+      {/* INGRESO ESPERADO - confirmar recibo */}
+      {metrics?.totalIncome === Number(data.cycleConfig?.expected_income || 0) && metrics?.cycleSpent === 0 && (
+        <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 14, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>💵 ¿Ya recibiste tu pago?</div>
+            <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+              Confirma cuando recibas RD${Math.round(data.cycleConfig?.expected_income || 0).toLocaleString('es-DO')} para actualizar tu balance real
+            </div>
+          </div>
+          <button
+            onClick={() => handleConfirmIncome(data.cycleConfig?.expected_income || 0)}
+            style={{ background: '#10b981', color: '#000', fontWeight: 700, fontSize: 13, padding: '9px 16px', border: 'none', borderRadius: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            ✓ Sí, ya lo recibí
+          </button>
+        </div>
+      )}
+
+      {/* INGRESO RECIBIDO - resumen */}
+      {metrics?.totalIncome > 0 && metrics?.totalIncome !== Number(data.cycleConfig?.expected_income || 0) && (
+        <div style={{ background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.15)', borderRadius: 14, padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 20 }}>✅</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#10b981' }}>Ingreso confirmado este ciclo</div>
+              <div style={{ fontSize: 11, color: '#64748b' }}>RD${Math.round(metrics.totalIncome).toLocaleString('es-DO')} registrado en movimientos</div>
+            </div>
+          </div>
+          <button
+            onClick={() => handleConfirmIncome(data.cycleConfig?.expected_income || 0)}
+            style={{ background: 'transparent', color: '#64748b', fontSize: 11, padding: '6px 12px', border: '1px solid #1e293b', borderRadius: 8, cursor: 'pointer' }}>
+            + Agregar otro
+          </button>
+        </div>
+      )}
+
       {/* SALUD DEL CICLO */}
       <div style={{ background: `${health?.color}15`, border: `1px solid ${health?.color}40`, borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{ fontSize: 24 }}>{health?.emoji}</span>
