@@ -323,6 +323,23 @@ ${recentTx || 'Sin transacciones'}
         </div>
       </div>
 
+      {/* NOTIFICACION DE INGRESO */}
+      {!metrics?.incomeConfirmed && Number(data.cycleConfig?.expected_income || 0) > 0 && (
+        <div style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(16,185,129,0.03))', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 14, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>💵</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>¿Ya recibiste tu pago?</div>
+            <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+              Se esperan <b style={{ color: '#10b981' }}>RD${Math.round(data.cycleConfig?.expected_income || 0).toLocaleString('es-DO')}</b> este ciclo
+            </div>
+          </div>
+          <button onClick={() => handleConfirmIncome(data.cycleConfig?.expected_income || 0)}
+            style={{ background: '#10b981', color: '#000', fontWeight: 700, fontSize: 13, padding: '10px 16px', border: 'none', borderRadius: 10, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            ✓ Lo recibí
+          </button>
+        </div>
+      )}
+
       {/* INDICADOR VISUAL DEL CICLO FINANCIERO */}
       <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)', border: '1px solid #312e81', borderRadius: 16, padding: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
