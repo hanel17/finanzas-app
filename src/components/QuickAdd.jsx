@@ -73,7 +73,7 @@ export default function QuickAdd({ onClose, onSaved }) {
       else { showToast('Gasto fijo agregado ✓'); onSaved?.(); onClose() }
     } else {
       const { error } = await supabase.from('transactions').insert({
-        user_id: user.id,
+        user_id: uid,
         type: tab,
         amount: Number(amount),
         description: (emoji ? emoji + ' ' : '') + description,
