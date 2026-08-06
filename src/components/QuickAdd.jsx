@@ -60,10 +60,12 @@ export default function QuickAdd({ onClose, onSaved }) {
   const handleSave = async () => {
     if (!amount || !description) return
     setLoading(true)
-
+    const { data: authData } = await supabase.auth.getUser()
+    const uid = authData?.user?.id || user?.id
+    if (!uid) { setLoading(false); showToast("Sesion expirada", "error"); return }
     if (tab === 'fixed') {
       const { error } = await supabase.from('fixed_expenses').insert({
-        user_id: user.id,
+        user_id: uid,
         name: (emoji ? emoji + ' ' : '') + description,
         amount: Number(amount),
         category,
