@@ -413,13 +413,13 @@ ${recentTx || 'Sin transacciones'}
         <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: 18, borderRadius: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 18 }}>💵</span>
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>¿Cuánto dinero tengo hoy?</span>
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>¿Cuánto me queda disponible?</span>
           </div>
           <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#10b981', letterSpacing: '-0.5px' }}>
-            {currSymbol}{fmt(metrics?.moneyInHand)}
+            {currSymbol}{fmt(metrics?.moneyAvailable)}
           </h2>
           <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
-            {metrics?.incomeConfirmed ? "Ingreso confirmado" : `Esperado: RD${Math.round(metrics?.expectedIncome || 0).toLocaleString("es-DO")}`}
+            Ingreso: RD${fmt(metrics?.totalIncome)} · Gastado: RD${fmt(metrics?.cycleSpent)}
           </div>
           {metrics?.cycleSavingsOut > 0 && (
             <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 2 }}>
