@@ -8,6 +8,6 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    storage: window.localStorage
+    storageKey: 'hr-finanzas-auth'
   }
 })
