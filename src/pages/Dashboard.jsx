@@ -291,6 +291,7 @@ ${recentTx || 'Sin transacciones'}
     incomeConfig: data.cycleConfig?.expected_income || 45000,
     cycle: currentCycle
   })
+  console.log('savings data:', data.savings, 'cycleSavingsOut should be:', data.savings?.filter(s => s.date >= currentCycle?.startDate && s.date <= currentCycle?.endDate && s.type === 'deposit').reduce((s,x) => s+Number(x.amount), 0))
   const health = FinancialEngine.getHealthLabel(metrics?.cycleHealth)
 
   const currSymbol = data.cycleConfig?.currency === 'USD' ? '$' : 'RD$'
