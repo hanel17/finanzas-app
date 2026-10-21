@@ -8,9 +8,9 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzbGJxemhkZmlzbndhZm1mdW9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMzIyODUsImV4cCI6MjEwMDgwODI4NX0.HDTeXkbYC1xenYN_yaUCCTFg9Go3_crEh984C6Hqzhs'
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
-const FALLBACK_MODEL = 'gemini-3.5-flash-lite'
-const ALLOWED_MODELS = ['gemini-3.8-flash', FALLBACK_MODEL]
-const DEFAULT_MODEL = ALLOWED_MODELS.includes(process.env.GEMINI_MODEL) ? process.env.GEMINI_MODEL : 'gemini-3.8-flash'
+const ALLOWED_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.8-flash']
+// Principal: gemini-3.5-flash-lite (rápido). GEMINI_MODEL puede cambiarlo.
+const DEFAULT_MODEL = ALLOWED_MODELS.includes(process.env.GEMINI_MODEL) ? process.env.GEMINI_MODEL : 'gemini-3.5-flash-lite'
 // Tiempo máximo por intento. Con el reintento queda dentro de maxDuration (60s, vercel.json).
 const ATTEMPT_TIMEOUT_MS = 20000
 // Errores con los que se reintenta una vez con el modelo de respaldo
@@ -100,7 +100,9 @@ export default async function handler(req, res) {
   }
 
   let result = await callGemini(apiKey, { ...basePayload, model })
-  if (model !== FALLBACK_MODEL && (result.timedOut || result.networkError || RETRY_STATUSES.includes(result.status))) {
+  // Respaldo: el otro modelo permitido (gemini-3.8-flash si el principal es flash-lite)
+  const FALLBACK_MODEL = ALLOWED_MODELS.find(m => m !== model)
+  if ((result.timedOut || result.networkError || RETRY_STATUSES.includes(result.status))) {
     console.warn(`Gemini ${model} falló (${result.timedOut ? 'timeout' : result.status || 'red'}), reintentando con ${FALLBACK_MODEL}`)
     result = await callGemini(apiKey, { ...basePayload, model: FALLBACK_MODEL })
   }
