@@ -252,13 +252,13 @@ ${recentTx || 'Sin transacciones'}
       const { data } = await aiChat({
           max_tokens: 500,
           messages: [
-            { role: 'system', content: 'Eres un asistente financiero personal con capacidad de modificar datos. Habla en espanol dominicano directo. Cuando pidan un cambio incluye al FINAL: |||ACTION|||{json}|||END||| Tipos: update_fixed_expense(name,amount?,due_day?,new_name?,category?), delete_fixed_expense(name), update_card_balance(bank,balance), update_goal(name,current_amount?,target_amount?,target_date?), add_transaction(tx_type,amount,description,category,date), delete_transaction(description?,amount?), update_income(income). Sin accion responde normal. ' + fullContext },
+            { role: 'system', content: 'Eres un asistente financiero personal con capacidad de modificar datos. Habla en espanol dominicano directo. Cuando pidan un cambio incluye al FINAL: |||ACTION|||{json}|||END||| El json SIEMPRE incluye el campo "type" con uno de estos tipos y sus campos: update_fixed_expense(name,amount?,due_day?,new_name?,category?), delete_fixed_expense(name), update_card_balance(bank,balance), update_goal(name,current_amount?,target_amount?,target_date?), add_transaction(tx_type,amount,description,category,date), delete_transaction(description?,amount?), update_income(income). En add_transaction, tx_type es "expense" o "income" y date es YYYY-MM-DD o "" para hoy. Ejemplo: |||ACTION|||{"type":"add_transaction","tx_type":"expense","amount":500,"description":"comida","category":"comida","date":""}|||END||| Sin accion responde normal. ' + fullContext },
             { role: 'user', content: question }
           ]
       })
       const rawReply = data.choices?.[0]?.message?.content || 'Sin respuesta.'
-      const actionMatch = rawReply.match(/\|\|\|ACTION\|\|\|([\s\S]*?)\|\|\|END\|\|\|/)
-      let finalReply = rawReply.replace(/\|\|\|ACTION\|\|\|[\s\S]*?\|\|\|END\|\|\|/g, '').trim()
+      const actionMatch = rawReply.match(/\|\|\|ACTION\|\|\|\s*(\{[\s\S]*?\})\s*(?:\|+\s*END\s*\|*|$)/)
+      let finalReply = rawReply.replace(/\|\|\|ACTION\|\|\|[\s\S]*?(?:\|+\s*END\s*\|*|$)/g, '').trim()
       if (actionMatch) {
         try {
           const actionObj = JSON.parse(actionMatch[1].trim())

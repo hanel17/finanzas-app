@@ -8,8 +8,13 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzbGJxemhkZmlzbndhZm1mdW9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMzIyODUsImV4cCI6MjEwMDgwODI4NX0.HDTeXkbYC1xenYN_yaUCCTFg9Go3_crEh984C6Hqzhs'
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
-const ALLOWED_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite']
+const FALLBACK_MODEL = 'gemini-3.5-flash-lite'
+const ALLOWED_MODELS = ['gemini-3.8-flash', FALLBACK_MODEL]
 const DEFAULT_MODEL = ALLOWED_MODELS.includes(process.env.GEMINI_MODEL) ? process.env.GEMINI_MODEL : 'gemini-3.8-flash'
+// Tiempo máximo por intento. Con el reintento queda dentro de maxDuration (60s, vercel.json).
+const ATTEMPT_TIMEOUT_MS = 20000
+// Errores con los que se reintenta una vez con el modelo de respaldo
+const RETRY_STATUSES = [404, 429, 500, 503]
 // En Gemini, los tokens de "pensamiento" cuentan dentro de max_tokens.
 // Se suma este margen para que la respuesta visible no se corte.
 const THINKING_HEADROOM = 2048
@@ -86,27 +91,49 @@ export default async function handler(req, res) {
     ? Math.min(requested, MAX_TOKENS_LIMIT)
     : DEFAULT_MAX_TOKENS
 
-  const payload = { model, messages, max_tokens: max_tokens + THINKING_HEADROOM, reasoning_effort: 'low' }
+  const basePayload = { messages, max_tokens: max_tokens + THINKING_HEADROOM, reasoning_effort: 'low' }
   if (typeof body.temperature === 'number') {
-    payload.temperature = Math.min(Math.max(body.temperature, 0), 2)
+    basePayload.temperature = Math.min(Math.max(body.temperature, 0), 2)
   }
   if (body.response_format && body.response_format.type === 'json_object') {
-    payload.response_format = { type: 'json_object' }
+    basePayload.response_format = { type: 'json_object' }
   }
 
+  let result = await callGemini(apiKey, { ...basePayload, model })
+  if (model !== FALLBACK_MODEL && (result.timedOut || result.networkError || RETRY_STATUSES.includes(result.status))) {
+    console.warn(`Gemini ${model} falló (${result.timedOut ? 'timeout' : result.status || 'red'}), reintentando con ${FALLBACK_MODEL}`)
+    result = await callGemini(apiKey, { ...basePayload, model: FALLBACK_MODEL })
+  }
+
+  if (result.timedOut) {
+    return res.status(504).json({ error: { message: 'El asistente tardó demasiado en responder. Intenta de nuevo.' } })
+  }
+  if (result.networkError) {
+    return res.status(502).json({ error: { message: 'No se pudo conectar con Gemini.' } })
+  }
+  return res.status(result.status).json(result.data)
+}
+
+async function callGemini(apiKey, payload) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), ATTEMPT_TIMEOUT_MS)
   try {
     const r = await fetch(GEMINI_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: controller.signal
     })
     const data = await r.json().catch(() => ({ error: { message: 'Respuesta inválida de Gemini.' } }))
     // Gemini a veces responde como lista de errores; normalizar a { error: { message } }
-    const out = Array.isArray(data) ? (data[0] || {}) : data
+    const out = Array.isArray(data) ? (data[0] || {}) : (data || {})
     if (!r.ok && !out.error) out.error = { message: 'Error del servicio de IA.' }
     if (!r.ok && typeof out.error === 'object' && !out.error.message) out.error.message = 'Error del servicio de IA.'
-    return res.status(r.status).json(out)
-  } catch {
-    return res.status(502).json({ error: { message: 'No se pudo conectar con Gemini.' } })
+    return { status: r.status, data: out, model: payload.model }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return { timedOut: true, model: payload.model }
+    return { networkError: true, model: payload.model }
+  } finally {
+    clearTimeout(timer)
   }
 }
