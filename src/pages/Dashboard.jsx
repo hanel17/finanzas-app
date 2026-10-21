@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { groqChat } from '../lib/groq'
 import { useAuth } from '../context/AuthContext'
 import ScanStatement from '../components/ScanStatement'
 import QuickAdd from '../components/QuickAdd'
@@ -248,19 +249,14 @@ ${Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`- ${k}: RD$${Math.r
 ${recentTx || 'Sin transacciones'}
       `
 
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + import.meta.env.VITE_GROQ_API_KEY },
-        body: JSON.stringify({
+      const { data } = await groqChat({
           model: 'llama-3.3-70b-versatile',
           max_tokens: 500,
           messages: [
             { role: 'system', content: 'Eres un asistente financiero personal con capacidad de modificar datos. Habla en espanol dominicano directo. Cuando pidan un cambio incluye al FINAL: |||ACTION|||{json}|||END||| Tipos: update_fixed_expense(name,amount?,due_day?,new_name?,category?), delete_fixed_expense(name), update_card_balance(bank,balance), update_goal(name,current_amount?,target_amount?,target_date?), add_transaction(tx_type,amount,description,category,date), delete_transaction(description?,amount?), update_income(income). Sin accion responde normal. ' + fullContext },
             { role: 'user', content: question }
           ]
-        })
       })
-      const data = await res.json()
       const rawReply = data.choices?.[0]?.message?.content || 'Sin respuesta.'
       const actionMatch = rawReply.match(/\|\|\|ACTION\|\|\|([\s\S]*?)\|\|\|END\|\|\|/)
       let finalReply = rawReply.replace(/\|\|\|ACTION\|\|\|[\s\S]*?\|\|\|END\|\|\|/g, '').trim()

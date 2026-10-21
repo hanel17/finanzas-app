@@ -1,0 +1,102 @@
+// Proxy seguro hacia Groq. La clave vive solo en el servidor (GROQ_API_KEY)
+// y solo usuarios con sesión válida de Supabase pueden usarlo.
+
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://uslbqzhdfisnwafmfuoa.supabase.co'
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzbGJxemhkZmlzbndhZm1mdW9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMzIyODUsImV4cCI6MjEwMDgwODI4NX0.HDTeXkbYC1xenYN_yaUCCTFg9Go3_crEh984C6Hqzhs'
+
+const ALLOWED_MODELS = ['llama-3.3-70b-versatile']
+const DEFAULT_MODEL = 'llama-3.3-70b-versatile'
+const DEFAULT_MAX_TOKENS = 1024
+const MAX_TOKENS_LIMIT = 8192
+const MAX_MESSAGES = 40
+const MAX_TOTAL_CHARS = 60000
+const ALLOWED_ROLES = ['system', 'user', 'assistant']
+
+async function getUser(token) {
+  const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` }
+  })
+  if (!r.ok) return null
+  const user = await r.json().catch(() => null)
+  return user && user.id ? user : null
+}
+
+function parseBody(req) {
+  if (req.body && typeof req.body === 'object') return req.body
+  if (typeof req.body === 'string') {
+    try { return JSON.parse(req.body) } catch { return null }
+  }
+  return null
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST')
+    return res.status(405).json({ error: { message: 'Método no permitido.' } })
+  }
+
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) {
+    return res.status(500).json({ error: { message: 'GROQ_API_KEY no está configurada en el servidor.' } })
+  }
+
+  const auth = req.headers.authorization || ''
+  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : ''
+  if (!token) return res.status(401).json({ error: { message: 'Debes iniciar sesión.' } })
+
+  let user
+  try {
+    user = await getUser(token)
+  } catch {
+    return res.status(502).json({ error: { message: 'No se pudo verificar la sesión.' } })
+  }
+  if (!user) return res.status(401).json({ error: { message: 'Sesión inválida o expirada.' } })
+
+  const body = parseBody(req)
+  if (!body || !Array.isArray(body.messages) || body.messages.length === 0) {
+    return res.status(400).json({ error: { message: 'Solicitud inválida.' } })
+  }
+  if (body.messages.length > MAX_MESSAGES) {
+    return res.status(400).json({ error: { message: 'Demasiados mensajes.' } })
+  }
+
+  let totalChars = 0
+  const messages = []
+  for (const m of body.messages) {
+    if (!m || !ALLOWED_ROLES.includes(m.role) || typeof m.content !== 'string') {
+      return res.status(400).json({ error: { message: 'Mensaje inválido.' } })
+    }
+    totalChars += m.content.length
+    messages.push({ role: m.role, content: m.content })
+  }
+  if (totalChars > MAX_TOTAL_CHARS) {
+    return res.status(413).json({ error: { message: 'El texto enviado es demasiado largo.' } })
+  }
+
+  const model = ALLOWED_MODELS.includes(body.model) ? body.model : DEFAULT_MODEL
+  const requested = Number.parseInt(body.max_tokens, 10)
+  const max_tokens = Number.isFinite(requested) && requested > 0
+    ? Math.min(requested, MAX_TOKENS_LIMIT)
+    : DEFAULT_MAX_TOKENS
+
+  const payload = { model, messages, max_tokens }
+  if (typeof body.temperature === 'number') {
+    payload.temperature = Math.min(Math.max(body.temperature, 0), 2)
+  }
+  if (body.response_format && body.response_format.type === 'json_object') {
+    payload.response_format = { type: 'json_object' }
+  }
+
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify(payload)
+    })
+    const data = await r.json().catch(() => ({ error: { message: 'Respuesta inválida de Groq.' } }))
+    return res.status(r.status).json(data)
+  } catch {
+    return res.status(502).json({ error: { message: 'No se pudo conectar con Groq.' } })
+  }
+}
