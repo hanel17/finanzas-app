@@ -1,12 +1,18 @@
-// Proxy seguro hacia Groq. La clave vive solo en el servidor (GROQ_API_KEY)
-// y solo usuarios con sesión válida de Supabase pueden usarlo.
+// Proxy seguro hacia Google Gemini (endpoint compatible con OpenAI).
+// La clave vive solo en el servidor (GEMINI_API_KEY) y solo usuarios con
+// sesión válida de Supabase pueden usarlo. Recibe y devuelve el mismo formato
+// estilo OpenAI (messages -> choices[0].message.content).
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://uslbqzhdfisnwafmfuoa.supabase.co'
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzbGJxemhkZmlzbndhZm1mdW9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMzIyODUsImV4cCI6MjEwMDgwODI4NX0.HDTeXkbYC1xenYN_yaUCCTFg9Go3_crEh984C6Hqzhs'
 
-const ALLOWED_MODELS = ['llama-3.3-70b-versatile']
-const DEFAULT_MODEL = 'llama-3.3-70b-versatile'
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
+const ALLOWED_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite']
+const DEFAULT_MODEL = ALLOWED_MODELS.includes(process.env.GEMINI_MODEL) ? process.env.GEMINI_MODEL : 'gemini-3.8-flash'
+// En Gemini, los tokens de "pensamiento" cuentan dentro de max_tokens.
+// Se suma este margen para que la respuesta visible no se corte.
+const THINKING_HEADROOM = 2048
 const DEFAULT_MAX_TOKENS = 1024
 const MAX_TOKENS_LIMIT = 8192
 const MAX_MESSAGES = 40
@@ -36,9 +42,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: { message: 'Método no permitido.' } })
   }
 
-  const apiKey = process.env.GROQ_API_KEY
+  const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
-    return res.status(500).json({ error: { message: 'GROQ_API_KEY no está configurada en el servidor.' } })
+    return res.status(500).json({ error: { message: 'GEMINI_API_KEY no está configurada en el servidor.' } })
   }
 
   const auth = req.headers.authorization || ''
@@ -80,7 +86,7 @@ export default async function handler(req, res) {
     ? Math.min(requested, MAX_TOKENS_LIMIT)
     : DEFAULT_MAX_TOKENS
 
-  const payload = { model, messages, max_tokens }
+  const payload = { model, messages, max_tokens: max_tokens + THINKING_HEADROOM, reasoning_effort: 'low' }
   if (typeof body.temperature === 'number') {
     payload.temperature = Math.min(Math.max(body.temperature, 0), 2)
   }
@@ -89,14 +95,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const r = await fetch(GEMINI_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify(payload)
     })
-    const data = await r.json().catch(() => ({ error: { message: 'Respuesta inválida de Groq.' } }))
-    return res.status(r.status).json(data)
+    const data = await r.json().catch(() => ({ error: { message: 'Respuesta inválida de Gemini.' } }))
+    // Gemini a veces responde como lista de errores; normalizar a { error: { message } }
+    const out = Array.isArray(data) ? (data[0] || {}) : data
+    if (!r.ok && !out.error) out.error = { message: 'Error del servicio de IA.' }
+    if (!r.ok && typeof out.error === 'object' && !out.error.message) out.error.message = 'Error del servicio de IA.'
+    return res.status(r.status).json(out)
   } catch {
-    return res.status(502).json({ error: { message: 'No se pudo conectar con Groq.' } })
+    return res.status(502).json({ error: { message: 'No se pudo conectar con Gemini.' } })
   }
 }

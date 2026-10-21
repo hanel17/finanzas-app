@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import { groqChat } from '../lib/groq'
+import { aiChat } from '../lib/ai'
 import { Sparkles, Send, X } from 'lucide-react'
 
 const QUICK = [
@@ -44,8 +44,7 @@ export default function AIBar({ userName }) {
     setReply(null)
     try {
       const context = await getContext()
-      const { data } = await groqChat({
-          model: "llama-3.3-70b-versatile",
+      const { data } = await aiChat({
           max_tokens: 300,
           messages: [
             { role: "system", content: "Eres un asesor financiero personal. Responde en maximo 3 oraciones, directo y en espanol. Datos del usuario: " + context },

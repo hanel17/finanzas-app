@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { groqChat } from '../lib/groq'
+import { aiChat } from '../lib/ai'
 import { useAuth } from '../context/AuthContext'
 import { Upload, CheckCircle2, AlertCircle, Sparkles, Loader2, RefreshCw } from 'lucide-react'
 
@@ -58,7 +58,7 @@ export default function ScanStatement({ onClose, onSaved }) {
     return ret.data.text
   }
 
-  const processTextWithGroq = async (extractedText) => {
+  const processTextWithAI = async (extractedText) => {
     const systemPrompt = `You are a strict financial transaction extractor. Analyze the provided text from bank statements or receipts.
 INSTRUCTIONS:
 1. Extract ALL listed transactions without skipping any item.
@@ -87,8 +87,7 @@ Return standard JSON:
   ]
 }`
 
-    const { ok, data } = await groqChat({
-        model: 'llama-3.3-70b-versatile',
+    const { ok, data } = await aiChat({
         max_tokens: 8192,
         response_format: { type: 'json_object' },
         temperature: 0.1,
@@ -101,7 +100,7 @@ ${extractedText.slice(0, 20000)}` }
     })
 
     if (!ok) {
-      throw new Error(data.error?.message || "Error procesando respuesta con Groq LLM.")
+      throw new Error(data.error?.message || "Error procesando la respuesta de la IA.")
     }
 
     let parsed = JSON.parse(data.choices[0]?.message?.content || '{}')
@@ -143,8 +142,8 @@ ${extractedText.slice(0, 20000)}` }
         throw new Error("El archivo no contiene texto legible.")
       }
 
-      setStatusText('Analizando transacciones con IA Groq...')
-      const parsedResult = await processTextWithGroq(rawText)
+      setStatusText('Analizando transacciones con IA...')
+      const parsedResult = await processTextWithAI(rawText)
       setResult(parsedResult)
     } catch (err) {
       console.error(err)
