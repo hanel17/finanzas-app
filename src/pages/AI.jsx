@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react"
 import { useAuth } from "../context/AuthContext"
 import { supabase } from "../lib/supabase"
+import { aiChat } from "../lib/ai"
 import { Send, Bot, Zap } from "lucide-react"
 
 const SUGGESTIONS = [
@@ -133,24 +134,18 @@ export default function AI() {
     try {
       const context = await getFinancialContext()
       const systemPrompt = "Eres un asistente financiero personal. Habla en espanol dominicano casual. REGLA CRITICA: Cuando el usuario pida modificar algo, DEBES incluir el bloque de accion. NUNCA digas que hiciste algo sin incluir el bloque. Formato OBLIGATORIO al final de tu respuesta cuando hay accion: |||ACTION|||JSON_AQUI|||END||| Ejemplos: Si piden cambiar dia de pago de casa a dia 15: |||ACTION|||{\"type\":\"update_fixed_expense\",\"name\":\"casa\",\"due_day\":15}|||END||| Si piden cambiar balance de BHD a 5000: |||ACTION|||{\"type\":\"update_card_balance\",\"bank\":\"BHD\",\"balance\":5000}|||END||| Si piden agregar gasto de 500 en comida: |||ACTION|||{\"type\":\"add_transaction\",\"tx_type\":\"expense\",\"amount\":500,\"description\":\"comida\",\"category\":\"comida\",\"date\":\"\"  }|||END||| Si NO hay accion, responde normal sin el bloque. DATOS: "+context
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer "+import.meta.env.VITE_GROQ_API_KEY },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+      const { data } = await aiChat({
           max_tokens: 600,
           messages: [
             { role: "system", content: systemPrompt },
             ...newMessages.slice(1).map(m => ({ role: m.role, content: m.content }))
           ]
-        })
       })
-      const data = await res.json()
       const rawReply = data.choices?.[0]?.message?.content || "Sin respuesta."
       console.log("RAW REPLY:", rawReply)
       console.log("HAS ACTION:", rawReply.includes("|||ACTION|||"))
-      const actionMatch = rawReply.match(/\|\|\|ACTION\|\|\|([\s\S]*?)\|\|\|END\|\|\|/)
-      let finalReply = rawReply.replace(/\|\|\|ACTION\|\|\|[\s\S]*?\|\|\|END\|\|\|/g, "").trim()
+      const actionMatch = rawReply.match(/\|\|\|ACTION\|\|\|\s*(\{[\s\S]*?\})\s*(?:\|+\s*END\s*\|*|$)/)
+      let finalReply = rawReply.replace(/\|\|\|ACTION\|\|\|[\s\S]*?(?:\|+\s*END\s*\|*|$)/g, "").trim()
       let actionResult = null
       if (actionMatch) {
         try {

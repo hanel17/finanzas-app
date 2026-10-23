@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { aiChat } from '../lib/ai'
 import { useAuth } from '../context/AuthContext'
 import { Upload, CheckCircle2, AlertCircle, Sparkles, Loader2, RefreshCw } from 'lucide-react'
 
@@ -57,12 +58,7 @@ export default function ScanStatement({ onClose, onSaved }) {
     return ret.data.text
   }
 
-  const processTextWithGroq = async (extractedText) => {
-    const apiKey = import.meta.env.VITE_GROQ_API_KEY
-    if (!apiKey) {
-      throw new Error("No se encontró la clave VITE_GROQ_API_KEY.")
-    }
-
+  const processTextWithAI = async (extractedText) => {
     const systemPrompt = `You are a strict financial transaction extractor. Analyze the provided text from bank statements or receipts.
 INSTRUCTIONS:
 1. Extract ALL listed transactions without skipping any item.
@@ -91,14 +87,8 @@ Return standard JSON:
   ]
 }`
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+    const { ok, data } = await aiChat({
+        max_tokens: 8192,
         response_format: { type: 'json_object' },
         temperature: 0.1,
         messages: [
@@ -107,12 +97,10 @@ Return standard JSON:
 
 ${extractedText.slice(0, 20000)}` }
         ]
-      })
     })
 
-    const data = await response.json()
-    if (!response.ok) {
-      throw new Error(data.error?.message || "Error procesando respuesta con Groq LLM.")
+    if (!ok) {
+      throw new Error(data.error?.message || "Error procesando la respuesta de la IA.")
     }
 
     let parsed = JSON.parse(data.choices[0]?.message?.content || '{}')
@@ -154,8 +142,8 @@ ${extractedText.slice(0, 20000)}` }
         throw new Error("El archivo no contiene texto legible.")
       }
 
-      setStatusText('Analizando transacciones con IA Groq...')
-      const parsedResult = await processTextWithGroq(rawText)
+      setStatusText('Analizando transacciones con IA...')
+      const parsedResult = await processTextWithAI(rawText)
       setResult(parsedResult)
     } catch (err) {
       console.error(err)

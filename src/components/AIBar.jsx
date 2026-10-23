@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { aiChat } from '../lib/ai'
 import { Sparkles, Send, X } from 'lucide-react'
 
 const QUICK = [
@@ -43,18 +44,13 @@ export default function AIBar({ userName }) {
     setReply(null)
     try {
       const context = await getContext()
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + import.meta.env.VITE_GROQ_API_KEY },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+      const { data } = await aiChat({
+          max_tokens: 300,
           messages: [
             { role: "system", content: "Eres un asesor financiero personal. Responde en maximo 3 oraciones, directo y en espanol. Datos del usuario: " + context },
             { role: "user", content: question }
           ]
-        })
       })
-      const data = await res.json()
       setReply(data.choices?.[0]?.message?.content || "Sin respuesta.")
     } catch(e) {
       setReply("Error conectando con el asistente.")
