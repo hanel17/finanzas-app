@@ -7,7 +7,7 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { signIn } = useAuth()
+  const { signIn, sessionExpired } = useAuth()
   const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
@@ -27,6 +27,7 @@ export default function Login() {
           <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--green)' }}>FinanzasApp</h1>
           <p style={{ color: 'var(--gray)', fontSize: 13, marginTop: 4 }}>Inicia sesión en tu cuenta</p>
         </div>
+        {sessionExpired && !error && <div style={{ background: 'rgba(255,214,10,0.1)', border: '1px solid var(--yellow)', borderRadius: 8, padding: '10px 12px', color: 'var(--yellow)', fontSize: 13, marginBottom: 16 }}>Tu sesión expiró. Inicia sesión de nuevo.</div>}
         {error && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid var(--red)', borderRadius: 8, padding: '10px 12px', color: 'var(--red)', fontSize: 13, marginBottom: 16 }}>{error}</div>}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>

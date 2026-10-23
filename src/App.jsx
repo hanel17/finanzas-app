@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom'
-import { AuthProvider, useAuth } from './context/AuthContext'
+import { useAuth } from './context/AuthContext'
 
 // Páginas
 import Dashboard from './pages/Dashboard'
@@ -26,6 +26,11 @@ function MainLayout({ children }) {
 
   if (location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/onboarding') {
     return children
+  }
+
+  // Sin sesión válida (o expirada): iniciar sesión otra vez.
+  if (!user) {
+    return <Navigate to="/login" replace />
   }
 
   const navItems = [
@@ -145,24 +150,22 @@ function MainLayout({ children }) {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <MainLayout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/movimientos" element={<Transactions />} />
-          <Route path="/tarjetas" element={<Cards />} />
-          <Route path="/metas" element={<Goals />} />
-          <Route path="/insights" element={<Insights />} />
-          <Route path="/ia" element={<AI />} />
-          <Route path="/cycle-config" element={<CycleConfig />} />
-          <Route path="/ahorros" element={<Savings />} />
-          <Route path="/gastos-fijos" element={<FixedExpenses />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </MainLayout>
-    </AuthProvider>
+    <MainLayout>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/movimientos" element={<Transactions />} />
+        <Route path="/tarjetas" element={<Cards />} />
+        <Route path="/metas" element={<Goals />} />
+        <Route path="/insights" element={<Insights />} />
+        <Route path="/ia" element={<AI />} />
+        <Route path="/cycle-config" element={<CycleConfig />} />
+        <Route path="/ahorros" element={<Savings />} />
+        <Route path="/gastos-fijos" element={<FixedExpenses />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </MainLayout>
   )
 }
